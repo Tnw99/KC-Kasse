@@ -261,7 +261,7 @@ function alkFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((
 function anzFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl,0); }
 function bierRundenCount(){ const set=new Set(); data.eintraege.forEach(e=>{ if(e.spielinfo&&e.spielinfo.startsWith("Bier-Runde")) set.add(e.spielinfo); }); return set.size; }
 function hatAlkDaten(){ return data.getraenke.some(g=>g.vol&&g.ml); }
-function grand(){ return r2(data.eintraege.filter(e=>e.bezahlt&&e.bezahlt!=="KASSE").reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
+function grand(){ return r2(data.eintraege.filter(e=>e.bezahlt).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
 function offenSumme(){ return r2(data.eintraege.filter(e=>!e.bezahlt).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
 
 /* zentrale Einträge + Undo */
@@ -415,7 +415,7 @@ function vKasse(){
   const offenZa=data.fuenferSpiel.filter(f=>!f.bezahlt).length;
   const bierR=bierRundenCount();
   html+=`<div class="grand"><div><b>Zu zahlen gesamt</b></div><span class="v">${fmt(grand())}</span></div>`;
-  html+=`<p class="hint" style="margin:-6px 0 12px">${gAnz} Getränke · 🍺 ${bierR} Bier-Runde${bierR===1?'':'n'}${offenZa?` · ${offenZa} 5er noch ohne Zahler`:""} · Kasse separat unten</p>`;
+  html+=`<p class="hint" style="margin:-6px 0 12px">${gAnz} Getränke · 🍺 ${bierR} Bier-Runde${bierR===1?'':'n'}${offenZa?` · ${offenZa} 5er noch ohne Zahler`:""} · Kasse-Anteil unten aufgeschlüsselt</p>`;
 
   html+=`<h2>Pro Person (Zahler)</h2>`;
   data.personen.forEach(p=>{
@@ -461,8 +461,7 @@ function sheetPerson(name){
     const items=Object.keys(c).sort().map(g=>`<div class="sline"><span>${esc(g)}</span><span>${c[g]}×</span></div>`).join("");
     getr+=`<div class="scard"><div class="sh" style="font-size:.9rem">${esc(game)}</div>${items}</div>`;
   });
-  const anz=anzFor(name), alk=alkFor(name);
-  const alkCard=hatAlkDaten()?`<div class="scard"><div class="sline"><span>reiner Alkohol getrunken</span><span style="color:var(--red);font-weight:700">${alk.toFixed(0)} g</span></div></div>`:"";
+  const anz=anzFor(name);
 
   const payItems=data.eintraege.filter(e=>e.bezahlt===name);
   const pc={}; payItems.forEach(e=>pc[e.getraenk]=(pc[e.getraenk]||0)+e.anzahl);
@@ -473,7 +472,6 @@ function sheetPerson(name){
   openSheet(head(esc(name)+(isGast(name)?' <span class="gastbadge">Gast</span>':''))+`
     <h2 style="margin-top:0">Getrunken (${anz})</h2>
     ${getr}
-    ${alkCard}
     <h2>Muss zahlen</h2>
     <div class="scard"><div class="sh"><span>Summe</span><span class="e">${fmt(r2(payTot))}</span></div>${payLines||'<div class="sline">nichts zu zahlen</div>'}</div>`);
 }
