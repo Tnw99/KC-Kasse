@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kegeldeckel">
+<meta name="theme-color" content="#16231e">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%2316231e'/%3E%3Cg stroke='%23f2efe6' stroke-width='10' stroke-linecap='round'%3E%3Cline x1='58' y1='55' x2='58' y2='125'/%3E%3Cline x1='78' y1='55' x2='78' y2='125'/%3E%3Cline x1='98' y1='55' x2='98' y2='125'/%3E%3Cline x1='118' y1='55' x2='118' y2='125'/%3E%3Cline x1='48' y1='128' x2='128' y2='52' stroke='%23e6b24a'/%3E%3C/g%3E%3C/svg%3E">
+<title>Kegeldeckel</title>
+<style>
+  :root{
+    --bg:#16231e; --bg2:#1e2f28; --bg3:#26382f;
+    --line:rgba(242,239,230,.13);
+    --chalk:#f2efe6; --dim:#9aa89f;
+    --amber:#e6b24a; --amber-soft:rgba(230,178,74,.16);
+    --green:#68b684; --green-soft:rgba(104,182,132,.16);
+    --red:#e07a5f;
+    --r:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--chalk);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-variant-numeric:tabular-nums;
+    display:flex; flex-direction:column; min-height:100dvh; overscroll-behavior-y:contain;
+  }
+  header{
+    padding:calc(env(safe-area-inset-top) + 14px) 18px 12px;
+    display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--line);
+  }
+  header .brand{font-weight:700; letter-spacing:.5px; font-size:1.1rem; flex:1}
+  header .brand small{color:var(--dim); font-weight:500; letter-spacing:.5px; font-size:.7rem; display:block; margin-top:2px}
+  header .sum{color:var(--amber); font-weight:700; font-size:1.15rem; white-space:nowrap}
+  .iconbtn{
+    background:var(--bg2); border:1px solid var(--line); color:var(--chalk);
+    width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.1rem;
+  }
+  .iconbtn:disabled{opacity:.3}
+  .iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  main{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px 16px 120px}
+
+  h2{font-size:.76rem; letter-spacing:.6px; text-transform:uppercase; color:var(--dim); margin:22px 4px 10px; font-weight:700}
+  h2:first-child{margin-top:2px}
+  .hint{color:var(--dim); font-size:.82rem; padding:2px 4px; line-height:1.5}
+  .empty{color:var(--dim); text-align:center; padding:44px 20px; line-height:1.5}
+
+  /* action buttons */
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .abtn{
+    background:var(--bg2); border:1px solid var(--line); border-radius:var(--r);
+    padding:18px 12px; color:var(--chalk); font-family:inherit; font-size:.95rem; font-weight:600;
+    display:flex; flex-direction:column; align-items:center; gap:8px; transition:transform .06s;
+  }
+  .abtn:active{transform:scale(.97); background:var(--bg3)}
+  .abtn .ic{font-size:1.7rem; line-height:1}
+  .abtn.wide{grid-column:span 2}
+  .abtn.accent{background:var(--amber-soft); border-color:var(--amber)}
+
+  /* stats pills */
+  .stats{display:flex; gap:10px; margin-bottom:14px}
+  .stat{flex:1; background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:12px 8px; text-align:center}
+  .stat .v{font-size:1.4rem; font-weight:800; display:block}
+  .stat .v.green{color:var(--green)} .stat .v.amber{color:var(--amber)}
+  .stat .l{font-size:.66rem; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin-top:2px}
+
+  /* top3 */
+  .top3{display:flex; gap:10px; margin-bottom:16px}
+  .top3 .t{flex:1; background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:14px 6px; text-align:center}
+  .top3 .m{font-size:1.5rem} .top3 .n{font-weight:700; font-size:.9rem; margin-top:4px}
+  .top3 .c{color:var(--dim); font-size:.72rem; margin-top:2px}
+
+  /* summary cards */
+  .grand{display:flex; justify-content:space-between; align-items:center; padding:16px;
+    margin-bottom:14px; border-radius:var(--r); background:var(--amber-soft); border:1px solid var(--amber)}
+  .grand b{font-size:.72rem; letter-spacing:.5px; text-transform:uppercase; color:var(--amber)}
+  .grand .v{font-size:1.5rem; font-weight:800; color:var(--amber)}
+  .scard{background:var(--bg2); border:1px solid var(--line); border-radius:var(--r); padding:14px; margin-bottom:10px}
+  .scard.kasse{border-color:var(--green); background:var(--green-soft)}
+  .scard.pending{border-color:var(--amber); background:var(--amber-soft)}
+  .scard.pending .sh .e{color:var(--amber)}
+  .scard .sh{font-weight:700; font-size:1rem; margin-bottom:8px; display:flex; justify-content:space-between}
+  .scard .sh .e{color:var(--amber)}
+  .scard.kasse .sh .e{color:var(--green)}
+  .sline{display:flex; justify-content:space-between; color:var(--dim); font-size:.88rem; padding:3px 0}
+  .sline.tot{border-top:1px solid var(--line); margin-top:6px; padding-top:7px; color:var(--chalk); font-weight:700}
+
+  /* list rows (5er + log) */
+  .lrow{background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:12px}
+  .lrow.done{background:var(--green-soft); border-color:var(--green)}
+  .lrow.pending{border-color:var(--amber)}
+  .selrow{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px}
+  .trsel{width:100%; padding:8px 26px 8px 10px; font-size:.82rem; border-radius:9px; background-color:var(--bg3)}
+  .trsel.off{border-color:var(--amber); color:var(--amber)}
+  .lrow .grow{flex:1; min-width:0}
+  .lrow .tt{font-weight:600; font-size:.95rem}
+  .lrow .sub{color:var(--dim); font-size:.78rem; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .lrow .price{color:var(--amber); font-weight:700; font-size:.9rem; white-space:nowrap}
+  .chk{width:30px;height:30px;border-radius:50%;border:2px solid var(--dim);display:flex;align-items:center;justify-content:center;color:transparent;font-size:.9rem;flex:0 0 auto}
+  .chk.on{background:var(--green);border-color:var(--green);color:#0e1a12}
+  .del{background:none;border:none;color:var(--red);font-size:1.3rem;padding:2px 8px;line-height:1;flex:0 0 auto}
+
+  /* setup items */
+  .item{display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--line);
+    border-radius:12px; padding:10px 12px; margin-bottom:8px}
+  .item .name{flex:1; font-weight:600}
+  .item .grow{flex:1; min-width:0}
+  .item .dmeta{color:var(--dim); font-size:.78rem; margin-top:2px}
+  .item .editarrow{color:var(--amber); font-size:1.2rem; flex:0 0 auto}
+  .item input.price{width:84px; text-align:right; background:var(--bg3); border:1px solid var(--line);
+    color:var(--chalk); border-radius:9px; padding:7px 8px; font-size:.95rem; font-family:inherit}
+  .item .unit{color:var(--dim)}
+  .gasttog{background:var(--bg3); border:1px solid var(--line); color:var(--dim); font-family:inherit;
+    font-size:.72rem; font-weight:700; padding:6px 10px; border-radius:999px; flex:0 0 auto}
+  .gasttog.on{background:var(--amber-soft); border-color:var(--amber); color:var(--amber)}
+  .gastbadge{display:inline-block; background:var(--amber-soft); color:var(--amber); border:1px solid var(--amber);
+    font-size:.62rem; font-weight:700; padding:1px 6px; border-radius:999px; vertical-align:middle; letter-spacing:.3px}
+  .scard{cursor:pointer}
+  /* bars */
+  .toggle{display:flex; gap:8px; background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:4px}
+  .toggle button{flex:1; background:none; border:none; color:var(--dim); font-family:inherit; font-weight:700;
+    padding:9px; border-radius:9px; font-size:.9rem}
+  .toggle button.on{background:var(--amber); color:#1a1108}
+  .barrow{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+  .barlabel{width:34%; font-size:.85rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .bartrack{flex:1; background:var(--bg3); border-radius:999px; height:16px; overflow:hidden}
+  .bar{height:100%; background:var(--amber); border-radius:999px; min-width:2px; transition:width .3s}
+  .bar.alk{background:var(--red)}
+  .barval{width:52px; text-align:right; font-size:.82rem; font-weight:700; color:var(--dim)}
+  .add{display:flex; gap:8px; margin-top:4px}
+  .add input{flex:1; background:var(--bg2); border:1px solid var(--line); color:var(--chalk);
+    border-radius:12px; padding:12px; font-size:1rem; font-family:inherit}
+  .add input.p{flex:0 0 92px; text-align:right}
+  .btn{border:none; border-radius:12px; padding:13px 16px; font-size:1rem; font-weight:700; font-family:inherit; background:var(--amber); color:#1a1108}
+  .btn:active{filter:brightness(.92)}
+  .btn.ghost{background:var(--bg2); color:var(--chalk); border:1px solid var(--line)}
+  .btn.danger{background:none; color:var(--red); border:1px solid var(--red)}
+  .btn.full{width:100%}
+  .stack{display:flex; flex-direction:column; gap:8px}
+
+  /* nav */
+  nav{position:fixed; left:0; right:0; bottom:0; display:flex; background:rgba(22,35,30,.94);
+    backdrop-filter:blur(12px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:20}
+  nav button{flex:1; background:none; border:none; color:var(--dim); font-family:inherit; padding:10px 0 8px;
+    font-size:.68rem; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:3px}
+  nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  nav button.on{color:var(--amber)}
+
+  /* sheet */
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:flex-end; z-index:50}
+  .overlay.on{display:flex}
+  .overlay.center{align-items:center; justify-content:center; padding:24px}
+  .cfbox{background:var(--bg2); border:1px solid var(--line); border-radius:18px; padding:20px; max-width:340px; width:100%}
+  .cfmsg{font-size:1rem; line-height:1.45; margin-bottom:18px}
+  .cfbtns{display:flex; gap:10px}
+  .cfbtns .btn{flex:1}
+  .sheet{width:100%; background:var(--bg); border-top-left-radius:22px; border-top-right-radius:22px;
+    border-top:1px solid var(--line); max-height:88dvh; overflow-y:auto; padding:8px 18px calc(20px + env(safe-area-inset-bottom))}
+  .sheet .bar{width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 6px}
+  .sheet .sh-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px}
+  .sheet .sh-head .t{font-weight:700; font-size:1.15rem}
+  .sheet .sh-head button{background:none;border:none;color:var(--amber);font-family:inherit;font-size:1rem;font-weight:600}
+  .fg{margin-bottom:14px}
+  .fg label{display:block; font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); margin-bottom:6px; font-weight:600}
+  select,.tinput{width:100%; padding:13px 12px; background:var(--bg2); border:1px solid var(--line); color:var(--chalk);
+    border-radius:12px; font-size:1rem; font-family:inherit; -webkit-appearance:none; appearance:none}
+  select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa89f' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center; padding-right:34px}
+
+  .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom));
+    background:var(--chalk); color:#16231e; font-weight:700; font-size:.9rem; padding:10px 16px; border-radius:999px;
+    opacity:0; transition:opacity .2s; pointer-events:none; box-shadow:0 6px 20px rgba(0,0,0,.3); z-index:60}
+  .toast.show{opacity:1}
+  svg.t line{stroke:var(--chalk); stroke-width:2.4; stroke-linecap:round}
+  svg.t line.cross{stroke:var(--amber)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Kegeldeckel<small>KC Pegelbrüder</small></div>
+  <div class="sum" id="headsum">0,00 €</div>
+  <button class="iconbtn" id="undoBtn" onclick="undo()">↩︎</button>
+</header>
+
+<main id="main"></main>
+
+<nav>
+  <button data-v="aktionen" class="on" onclick="setView('aktionen')">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Aktionen</button>
+  <button data-v="fuenfer" onclick="setView('fuenfer')">
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="8.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="8.5" cy="15.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/></svg>5er</button>
+  <button data-v="kasse" onclick="setView('kasse')">
+    <svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 10h18M7 15h4"/></svg>Kasse</button>
+  <button data-v="log" onclick="setView('log')">
+    <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Log</button>
+  <button data-v="setup" onclick="setView('setup')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>Setup</button>
+</nav>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="overlay center" id="cfOverlay" onclick="if(event.target===this)cfNo()">
+  <div class="cfbox">
+    <div class="cfmsg" id="cfMsg"></div>
+    <div class="cfbtns">
+      <button class="btn ghost" onclick="cfNo()">Abbrechen</button>
+      <button class="btn danger" id="cfOk" onclick="cfYes()">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const KEY="shotSystem"; // gleiche Ablage wie alte Version -> vorhandene Daten laden automatisch
+const uid=()=>Math.random().toString(36).slice(2,10);
+const r2=x=>Math.round(x*100)/100;
+const fmt=e=>e.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let data=load();
+let view="aktionen";
+let undoStack=[]; // [{entryIds:[], fuenferId?}]
+
+function seed(){
+  return {
+    personen:["Jerry","Luiz","Mats","Flo"], gaeste:[],
+    getraenke:[
+      {name:"Jägermeister",preis:2.00,vol:35,ml:20},{name:"Klopfer",preis:1.50,vol:15,ml:20},{name:"Tequila",preis:2.50,vol:38,ml:20},
+      {name:"Vodka",preis:2.00,vol:40,ml:20},{name:"Obstler",preis:1.80,vol:40,ml:20},{name:"Ouzo",preis:2.20,vol:37,ml:20},
+      {name:"Sambuca",preis:2.30,vol:38,ml:20},{name:"Ramazotti",preis:2.50,vol:30,ml:20},{name:"Underberg",preis:1.50,vol:44,ml:20},
+      {name:"Berliner Luft",preis:1.80,vol:18,ml:20},{name:"Bier",preis:3.50,vol:5,ml:500},{name:"Wasser",preis:2.00,vol:0,ml:0}
+    ],
+    eintraege:[], fuenferSpiel:[]
+  };
+}
+function load(){
+  try{
+    const s=JSON.parse(localStorage.getItem(KEY));
+    if(s&&s.personen&&s.getraenke){
+      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[];
+      s.eintraege.forEach(e=>{if(!e.id)e.id=uid();});
+      s.fuenferSpiel.forEach(f=>{if(!f.id)f.id=uid();});
+      return s;
+    }
+  }catch(e){}
+  return seed();
+}
+function save(){ try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){} }
+function drinkOf(name){ return data.getraenke.find(g=>g.name===name)||null; }
+function preisOf(name){ const g=drinkOf(name); return g?g.preis:0; }
+function isGast(name){ return data.gaeste.includes(name); }
+/* reiner Alkohol in Gramm pro Getränk (ml * vol% * 0.789) */
+function alkOf(name){ const g=drinkOf(name); if(!g||!g.vol||!g.ml) return 0; return g.ml*(g.vol/100)*0.789; }
+function alkFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl*alkOf(e.getraenk),0); }
+function anzFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl,0); }
+function bierRundenCount(){ const set=new Set(); data.eintraege.forEach(e=>{ if(e.spielinfo&&e.spielinfo.startsWith("Bier-Runde")) set.add(e.spielinfo); }); return set.size; }
+function hatAlkDaten(){ return data.getraenke.some(g=>g.vol&&g.ml); }
+function grand(){ return r2(data.eintraege.filter(e=>e.bezahlt&&e.bezahlt!=="KASSE").reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
+function offenSumme(){ return r2(data.eintraege.filter(e=>!e.bezahlt).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
+
+/* zentrale Einträge + Undo */
+function pushEntries(list, extra){
+  const ids=[];
+  list.forEach(e=>{ e.id=uid(); e.timestamp=new Date().toISOString(); data.eintraege.push(e); ids.push(e.id); });
+  undoStack.push(Object.assign({entryIds:ids}, extra||{}));
+  if(undoStack.length>100) undoStack.shift();
+  save(); render();
+}
+function undo(){
+  const a=undoStack.pop(); if(!a) return;
+  if(a.entryIds) data.eintraege=data.eintraege.filter(e=>!a.entryIds.includes(e.id));
+  if(a.fuenferId) data.fuenferSpiel=data.fuenferSpiel.filter(f=>f.id!==a.fuenferId);
+  save(); render(); toast("Rückgängig");
+}
+
+/* ---------- Aktionen (Regeln 1:1 aus alter Version) ---------- */
+function doShotRunde(shot, starter){
+  pushEntries(data.personen.map(p=>({
+    getraenk:shot, trinkt:p, bezahlt:p===starter?"KASSE":p, anzahl:1, spielinfo:`Alle 9 (${starter})`
+  })));
+  toast("Shot-Runde erstellt");
+}
+function doBierRunde(){
+  let maxNr=0;
+  data.eintraege.forEach(e=>{ if(e.spielinfo&&e.spielinfo.startsWith("Bier-Runde")){ const m=e.spielinfo.match(/\d+/); if(m)maxNr=Math.max(maxNr,+m[0]); }});
+  const nr=maxNr+1;
+  const cnt={}; data.personen.forEach(p=>cnt[p]=0);
+  data.eintraege.forEach(e=>{ if(e.getraenk.toLowerCase()==="bier"&&cnt[e.trinkt]!==undefined) cnt[e.trinkt]+=e.anzahl; });
+  pushEntries(data.personen.map(p=>{
+    const n=cnt[p]+1;
+    return {getraenk:"Bier", trinkt:p, bezahlt:n<=3?"KASSE":p, anzahl:1, spielinfo:`Bier-Runde ${nr}`};
+  }));
+  toast(`Bier-Runde ${nr} erstellt`);
+}
+function doRunde(geber, getraenk){
+  pushEntries(data.personen.map(p=>({
+    getraenk, trinkt:p, bezahlt:geber, anzahl:1, spielinfo:`Runde von ${geber}`
+  })));
+  toast(`${geber} gibt eine Runde`);
+}
+function doFuenfer(shot){
+  const eId=uid();
+  const entry={id:eId, timestamp:new Date().toISOString(), getraenk:shot, trinkt:null, bezahlt:null, anzahl:1, spielinfo:"5er-Spiel"};
+  data.eintraege.push(entry);
+  const f={id:uid(), timestamp:new Date().toISOString(), getraenk:shot, bezahlt:null, trinkt:null, bestellt:false, eintragId:eId};
+  data.fuenferSpiel.push(f);
+  undoStack.push({entryIds:[eId], fuenferId:f.id});
+  if(undoStack.length>100) undoStack.shift();
+  save(); render();
+  toast("5er verbucht – Zahler & Trinker später zuordnen");
+}
+function assignTrinkt(id, name){
+  const f=data.fuenferSpiel.find(x=>x.id===id); if(!f) return;
+  f.trinkt=name||null;
+  const e=data.eintraege.find(x=>x.id===f.eintragId); if(e) e.trinkt=name||null;
+  save(); render();
+}
+function assignBezahlt(id, name){
+  const f=data.fuenferSpiel.find(x=>x.id===id); if(!f) return;
+  f.bezahlt=name||null;
+  const e=data.eintraege.find(x=>x.id===f.eintragId); if(e) e.bezahlt=name||null;
+  save(); render();
+}
+function doEinzel(getraenk, trinkt, bezahlt, anzahl, spiel, kommentar){
+  let spielinfo="Einzelgetränk";
+  if(spiel&&spiel!=="Sonstiges") spielinfo=spiel;
+  else if(spiel==="Sonstiges"&&kommentar) spielinfo=kommentar;
+  pushEntries([{getraenk, trinkt, bezahlt, anzahl:Math.max(1,anzahl||1), spielinfo}]);
+  toast(`${anzahl||1}× ${getraenk} hinzugefügt`);
+}
+
+/* ---------- Tally ---------- */
+function tally(n){
+  if(n<=0) return '';
+  let s=''; const g=Math.ceil(n/5); const W=g*26;
+  s=`<svg class="t" width="${W}" height="18" viewBox="0 0 ${W} 18">`;
+  for(let k=0;k<g;k++){ const rem=Math.min(5,n-k*5), ox=k*26+2, bars=Math.min(4,rem);
+    for(let i=0;i<bars;i++){const x=ox+i*5; s+=`<line x1="${x}" y1="2" x2="${x}" y2="16"/>`;}
+    if(rem===5) s+=`<line class="cross" x1="${ox-2}" y1="16" x2="${ox+18}" y2="2"/>`;
+  }
+  return s+'</svg>';
+}
+
+/* ---------- Render ---------- */
+function render(){
+  document.getElementById("headsum").textContent=fmt(grand());
+  document.getElementById("undoBtn").disabled=undoStack.length===0;
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.v===view));
+  const m=document.getElementById("main");
+  m.innerHTML = view==="aktionen"?vAktionen(): view==="fuenfer"?vFuenfer(): view==="kasse"?vKasse(): view==="log"?vLog(): vSetup();
+}
+
+function vAktionen(){
+  if(!data.personen.length) return `<div class="empty">Erst Personen im Setup-Tab anlegen.</div>`;
+  return `
+    <div class="grid">
+      <button class="abtn" onclick="sheetShot()"><span class="ic">🥃</span>Shot-Runde</button>
+      <button class="abtn" onclick="sheetBier()"><span class="ic">🍺</span>Bier-Runde</button>
+      <button class="abtn" onclick="sheetRunde()"><span class="ic">🎁</span>Runde ausgeben</button>
+      <button class="abtn" onclick="sheetFuenfer()"><span class="ic">🎲</span>5er-Spiel</button>
+      <button class="abtn wide accent" onclick="sheetEinzel()"><span class="ic">✏️</span>Einzelnes Getränk</button>
+    </div>
+    <p class="hint" style="margin-top:14px">Shot-Runde: der Starter (Alle 9) geht auf die Kasse, alle anderen zahlen selbst.
+    Bier-Runde: die ersten 3 Bier pro Person zahlt die Kasse, ab dem 4. selbst.
+    Runde: zahlt komplett der Ausgebende.</p>`;
+}
+
+function vFuenfer(){
+  const ges=data.fuenferSpiel.length;
+  const offenZa=data.fuenferSpiel.filter(f=>!f.bezahlt).length;
+  const offenTr=data.fuenferSpiel.filter(f=>!f.trinkt).length;
+  const personOptsSel=(cur)=>data.personen.map(p=>`<option ${cur===p?'selected':''}>${esc(p)}</option>`).join("");
+  const rows = ges===0 ? `<div class="empty">Noch keine 5er-Shots.</div>`
+    : data.fuenferSpiel.map((f,i)=>`
+      <div class="lrow ${f.bestellt?'done':''} ${(!f.bezahlt||!f.trinkt)?'pending':''}">
+        <div class="chk ${f.bestellt?'on':''}" onclick="toggleBestellt('${f.id}')">✓</div>
+        <div class="grow">
+          <div class="tt">#${i+1} · ${esc(f.getraenk)}</div>
+          <div class="selrow">
+            <select class="trsel ${!f.bezahlt?'off':''}" onchange="assignBezahlt('${f.id}',this.value)">
+              <option value="" ${!f.bezahlt?'selected':''}>💶 Zahler wählen</option>${personOptsSel(f.bezahlt)}</select>
+            <select class="trsel ${!f.trinkt?'off':''}" onchange="assignTrinkt('${f.id}',this.value)">
+              <option value="" ${!f.trinkt?'selected':''}>🥃 Trinker wählen</option>${personOptsSel(f.trinkt)}</select>
+          </div>
+        </div>
+        <button class="del" onclick="delFuenfer('${f.id}')">×</button>
+      </div>`).join("");
+  return `
+    <div class="stats">
+      <div class="stat"><span class="v">${ges}</span><div class="l">Gesamt</div></div>
+      <div class="stat"><span class="v amber">${offenZa}</span><div class="l">Zahler&nbsp;offen</div></div>
+      <div class="stat"><span class="v amber">${offenTr}</span><div class="l">Trinker&nbsp;offen</div></div>
+    </div>
+    <button class="btn full" style="margin-bottom:14px" onclick="sheetFuenfer()">+ 5er verbuchen</button>
+    ${rows}`;
+}
+
+function vKasse(){
+  if(!data.eintraege.length) return `<div class="empty">Noch nichts getrunken.</div>`;
+  const anzahl={}; data.personen.forEach(p=>anzahl[p]=0);
+  data.eintraege.forEach(e=>{ if(anzahl[e.trinkt]!==undefined) anzahl[e.trinkt]+=e.anzahl; });
+  const top3=data.personen.map(p=>({p,n:anzahl[p]})).sort((a,b)=>b.n-a.n).slice(0,3);
+  const medals=["🥇","🥈","🥉"];
+  let html=`<h2 style="display:flex;justify-content:space-between;align-items:baseline">Meiste Getränke <span onclick="sheetRanking('anz')" style="color:var(--amber);text-transform:none;letter-spacing:0;cursor:pointer">Alle ›</span></h2>
+    <div class="top3" onclick="sheetRanking('anz')">`+
+    top3.map((x,i)=>`<div class="t"><div class="m">${medals[i]}</div><div class="n">${esc(x.p)}${isGast(x.p)?' <span class="gastbadge">G</span>':''}</div><div class="c">${x.n} Stück</div></div>`).join("")+`</div>`;
+
+  const gAnz=data.eintraege.reduce((a,e)=>a+e.anzahl,0);
+  const offenZa=data.fuenferSpiel.filter(f=>!f.bezahlt).length;
+  const bierR=bierRundenCount();
+  html+=`<div class="grand"><div><b>Zu zahlen gesamt</b></div><span class="v">${fmt(grand())}</span></div>`;
+  html+=`<p class="hint" style="margin:-6px 0 12px">${gAnz} Getränke · 🍺 ${bierR} Bier-Runde${bierR===1?'':'n'}${offenZa?` · ${offenZa} 5er noch ohne Zahler`:""} · Kasse separat unten</p>`;
+
+  html+=`<h2>Pro Person (Zahler)</h2>`;
+  data.personen.forEach(p=>{
+    const items=data.eintraege.filter(e=>e.bezahlt===p);
+    const badge=isGast(p)?' <span class="gastbadge">Gast</span>':'';
+    if(!items.length){ html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">0,00 €</span></div><div class="sline">nichts zu zahlen · Details ›</div></div>`; return; }
+    const c={}; items.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
+    let tot=0, lines="";
+    Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
+      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
+    html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">${fmt(r2(tot))}</span></div>${lines}<div class="sline" style="color:var(--amber)">Details ›</div></div>`;
+  });
+
+  const offen=data.eintraege.filter(e=>!e.bezahlt);
+  if(offen.length){
+    const c={}; offen.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
+    let tot=0, lines="";
+    Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
+      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
+    html+=`<h2>Noch offen (kein Zahler)</h2><div class="scard pending"><div class="sh"><span>❓ Offen</span><span class="e">${fmt(r2(tot))}</span></div>${lines}</div>`;
+  }
+
+  const kasse=data.eintraege.filter(e=>e.bezahlt==="KASSE");
+  if(kasse.length){
+    const c={}; kasse.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
+    let tot=0, lines="";
+    Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
+      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
+    html+=`<h2>Kasse</h2><div class="scard kasse"><div class="sh"><span>🍻 Kasse</span><span class="e">${fmt(r2(tot))}</span></div>${lines}</div>`;
+  }
+  return html;
+}
+
+/* Personen-Detail: was getrunken (nach Spiel) + was zu zahlen */
+function sheetPerson(name){
+  const drunk=data.eintraege.filter(e=>e.trinkt===name);
+  const byGame={};
+  drunk.forEach(e=>{ const k=e.spielinfo||"Sonstiges"; (byGame[k]=byGame[k]||[]).push(e); });
+  let getr="";
+  if(!drunk.length) getr=`<p class="hint">Noch nichts getrunken.</p>`;
+  else Object.keys(byGame).forEach(game=>{
+    const c={}; byGame[game].forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
+    const items=Object.keys(c).sort().map(g=>`<div class="sline"><span>${esc(g)}</span><span>${c[g]}×</span></div>`).join("");
+    getr+=`<div class="scard"><div class="sh" style="font-size:.9rem">${esc(game)}</div>${items}</div>`;
+  });
+  const anz=anzFor(name), alk=alkFor(name);
+  const alkCard=hatAlkDaten()?`<div class="scard"><div class="sline"><span>reiner Alkohol getrunken</span><span style="color:var(--red);font-weight:700">${alk.toFixed(0)} g</span></div></div>`:"";
+
+  const payItems=data.eintraege.filter(e=>e.bezahlt===name);
+  const pc={}; payItems.forEach(e=>pc[e.getraenk]=(pc[e.getraenk]||0)+e.anzahl);
+  let payTot=0, payLines="";
+  Object.keys(pc).sort().forEach(g=>{ const sub=r2(pc[g]*preisOf(g)); payTot+=sub;
+    payLines+=`<div class="sline"><span>${esc(g)} · ${pc[g]}×</span><span>${fmt(sub)}</span></div>`; });
+
+  openSheet(head(esc(name)+(isGast(name)?' <span class="gastbadge">Gast</span>':''))+`
+    <h2 style="margin-top:0">Getrunken (${anz})</h2>
+    ${getr}
+    ${alkCard}
+    <h2>Muss zahlen</h2>
+    <div class="scard"><div class="sh"><span>Summe</span><span class="e">${fmt(r2(payTot))}</span></div>${payLines||'<div class="sline">nichts zu zahlen</div>'}</div>`);
+}
+
+let rankMode="anz";
+function sheetRanking(mode){
+  rankMode=mode||rankMode;
+  const alk=rankMode==="alk";
+  if(alk && !hatAlkDaten()){
+    openSheet(head("Rangliste")+rankToggle()+`<p class="hint" style="margin-top:14px">Für die Alkohol-Auswertung trag bitte im Setup bei den Getränken <b>%vol</b> und <b>ml</b> ein.</p>`);
+    return;
+  }
+  const rows=data.personen.map(p=>({p, v: alk?alkFor(p):anzFor(p)})).sort((a,b)=>b.v-a.v);
+  const max=Math.max(1,...rows.map(r=>r.v));
+  const bars=rows.map((r,i)=>{
+    const w=Math.round(r.v/max*100);
+    const label=alk?`${r.v.toFixed(0)} g`:`${r.v}×`;
+    return `<div class="barrow">
+      <div class="barlabel">${i+1}. ${esc(r.p)}${isGast(r.p)?' <span class="gastbadge">G</span>':''}</div>
+      <div class="bartrack"><div class="bar ${alk?'alk':''}" style="width:${w}%"></div></div>
+      <div class="barval">${label}</div>
+    </div>`;
+  }).join("");
+  openSheet(head(alk?"Meister Alkohol":"Meiste Getränke")+rankToggle()+`<div style="margin-top:14px">${bars}</div>`+
+    (alk?`<p class="hint" style="margin-top:10px">Reiner Alkohol in Gramm (ml × %vol × 0,789), nur zugeordnete Trinker.</p>`:``));
+}
+function rankToggle(){
+  return `<div class="toggle">
+    <button class="${rankMode==='anz'?'on':''}" onclick="sheetRanking('anz')">Anzahl</button>
+    <button class="${rankMode==='alk'?'on':''}" onclick="sheetRanking('alk')">Alkohol</button>
+  </div>`;
+}
+
+function vLog(){
+  if(!data.eintraege.length) return `<div class="empty">Noch keine Einträge.</div>`;
+  return [...data.eintraege].reverse().map(e=>`
+    <div class="lrow">
+      <div class="grow">
+        <div class="tt">${e.anzahl>1?e.anzahl+"× ":""}${esc(e.getraenk)}</div>
+        <div class="sub">trinkt ${e.trinkt?esc(e.trinkt):"—"} · zahlt ${e.bezahlt?esc(e.bezahlt):"—"}${e.spielinfo?" · "+esc(e.spielinfo):""}</div>
+      </div>
+      <span class="price">${e.bezahlt==="KASSE"?"Kasse":fmt(r2(e.anzahl*preisOf(e.getraenk)))}</span>
+      <button class="del" onclick="delEintrag('${e.id}')">×</button>
+    </div>`).join("");
+}
+
+function vSetup(){
+  const persons=data.personen.map((p,i)=>`<div class="item">
+      <span class="name">${esc(p)}${isGast(p)?' <span class="gastbadge">Gast</span>':''}</span>
+      <button class="gasttog ${isGast(p)?'on':''}" onclick="toggleGast(${i})">Gast</button>
+      <button class="del" onclick="delPerson(${i})">×</button></div>`).join("")||`<p class="hint">Keine Personen.</p>`;
+  const drinks=data.getraenke.map((g,i)=>{
+    const meta=[fmt(g.preis), (g.vol?g.vol+"%vol":""), (g.ml?g.ml+" ml":"")].filter(Boolean).join(" · ");
+    return `<div class="item" onclick="sheetDrink(${i})">
+      <div class="grow"><div class="name">${esc(g.name)}</div><div class="dmeta">${meta}</div></div>
+      <span class="editarrow">›</span></div>`;
+  }).join("")||`<p class="hint">Keine Getränke.</p>`;
+  return `
+    <h2>Personen</h2>${persons}
+    <div class="add"><input id="npName" placeholder="Neue Person" autocomplete="off"><button class="btn" onclick="addPerson()">+</button></div>
+    <p class="hint">Tipp „Gast" markiert Personen, die nicht fest dabei sind (Badge in Kasse &amp; Rangliste).</p>
+    <h2>Getränke &amp; Preise</h2>${drinks}
+    <button class="btn full" style="margin-top:6px" onclick="sheetDrink(-1)">+ Getränk hinzufügen</button>
+    <p class="hint">Getränk antippen zum Bearbeiten. %vol und ml sind optional – nur nötig für die Alkohol-Rangliste.</p>
+    <h2>Daten</h2>
+    <div class="stack">
+      <button class="btn ghost" onclick="exportData()">Abend exportieren (JSON)</button>
+      <label class="btn ghost" style="text-align:center">Import (JSON)<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
+      <button class="btn danger" onclick="resetAbend()">Abend zurücksetzen</button>
+    </div>
+    <p class="hint">„Abend zurücksetzen" löscht alle Einträge &amp; 5er-Shots — Personen und Preise bleiben.</p>`;
+}
+function sheetDrink(i){
+  const g=i>=0?data.getraenke[i]:{name:"",preis:"",vol:"",ml:""};
+  openSheet(head(i>=0?"Getränk bearbeiten":"Neues Getränk")+`
+    <div class="fg"><label>Name</label><input class="tinput" id="d_name" value="${esc(g.name||"")}" placeholder="z.B. Tequila"></div>
+    <div class="fg"><label>Preis (€)</label><input class="tinput" id="d_preis" type="number" inputmode="decimal" step="0.05" min="0" value="${g.preis!==""&&g.preis!=null?g.preis:""}" placeholder="2.50"></div>
+    <div class="selrow">
+      <div class="fg" style="margin:0"><label>%vol (optional)</label><input class="tinput" id="d_vol" type="number" inputmode="decimal" step="0.5" min="0" max="100" value="${g.vol||""}" placeholder="38"></div>
+      <div class="fg" style="margin:0"><label>ml (optional)</label><input class="tinput" id="d_ml" type="number" inputmode="decimal" step="1" min="0" value="${g.ml||""}" placeholder="20"></div>
+    </div>
+    <button class="btn full" style="margin-top:16px" onclick="saveDrink(${i})">Speichern</button>
+    ${i>=0?`<button class="btn danger full" style="margin-top:8px" onclick="delGetraenkSheet(${i})">Getränk löschen</button>`:""}`);
+}
+function saveDrink(i){
+  const name=(val("d_name")||"").trim(); const preis=parseFloat(val("d_preis"));
+  if(!name||isNaN(preis)){ toast("Name & Preis nötig"); return; }
+  const vol=parseFloat(val("d_vol")), ml=parseFloat(val("d_ml"));
+  const obj={name, preis:r2(Math.max(0,preis)), vol:isNaN(vol)?0:Math.max(0,vol), ml:isNaN(ml)?0:Math.max(0,ml)};
+  if(i>=0){ data.getraenke[i]=obj; } else {
+    if(data.getraenke.some(g=>g.name===name)){ toast("Existiert bereits"); return; }
+    data.getraenke.push(obj);
+  }
+  save(); render(); closeSheet();
+}
+function delGetraenkSheet(i){ const name=data.getraenke[i].name; askConfirm(`${name} löschen?`, ()=>{ data.getraenke.splice(i,1); save(); render(); closeSheet(); }); }
+
+/* ---------- Sheets ---------- */
+function opts(list){ return list.map(x=>`<option>${esc(x)}</option>`).join(""); }
+function personOpts(){ return opts(data.personen); }
+function getraenkOpts(){ return opts(data.getraenke.map(g=>g.name)); }
+function openSheet(html){ document.getElementById("sheet").innerHTML=`<div class="bar"></div>`+html; document.getElementById("overlay").classList.add("on"); }
+function closeSheet(){ document.getElementById("overlay").classList.remove("on"); }
+function head(title){ return `<div class="sh-head"><span class="t">${title}</span><button onclick="closeSheet()">Fertig</button></div>`; }
+function val(id){ return document.getElementById(id).value; }
+
+function sheetShot(){ openSheet(head("Shot-Runde")+`
+  <div class="fg"><label>Shot</label><select id="s_shot">${getraenkOpts()}</select></div>
+  <div class="fg"><label>Starter (Alle 9 – zahlt nicht)</label><select id="s_starter">${personOpts()}</select></div>
+  <button class="btn full" onclick="doShotRunde(val('s_shot'),val('s_starter'));closeSheet()">Erstellen</button>`); }
+
+function sheetBier(){ openSheet(head("Bier-Runde")+`
+  <p class="hint" style="margin-bottom:14px">Jede Person bekommt +1 Bier. Die ersten 3 Bier pro Person zahlt die Kasse, ab dem 4. selbst.</p>
+  <button class="btn full" onclick="doBierRunde();closeSheet()">Erstellen</button>`); }
+
+function sheetRunde(){ openSheet(head("Runde ausgeben")+`
+  <div class="fg"><label>Wer gibt aus?</label><select id="r_geber">${personOpts()}</select></div>
+  <div class="fg"><label>Getränk</label><select id="r_getr">${getraenkOpts()}</select></div>
+  <button class="btn full" onclick="doRunde(val('r_geber'),val('r_getr'));closeSheet()">Erstellen</button>`); }
+
+function sheetFuenfer(){ openSheet(head("5er-Spiel")+`
+  <div class="fg"><label>Shot</label><select id="f_shot">${getraenkOpts()}</select></div>
+  <p class="hint" style="margin-bottom:14px">Zahler und Trinker ordnest du danach direkt im 5er-Tab zu.</p>
+  <button class="btn full" onclick="doFuenfer(val('f_shot'));closeSheet()">Verbuchen</button>`); }
+
+function sheetEinzel(){ openSheet(head("Einzelnes Getränk")+`
+  <div class="fg"><label>Getränk</label><select id="e_getr">${getraenkOpts()}</select></div>
+  <div class="fg"><label>Trinkt</label><select id="e_trinkt">${personOpts()}</select></div>
+  <div class="fg"><label>Bezahlt</label><select id="e_bez">${personOpts()}<option>KASSE</option></select></div>
+  <div class="fg"><label>Anzahl</label><input class="tinput" id="e_anz" type="number" inputmode="numeric" min="1" value="1"></div>
+  <div class="fg"><label>Spiel / Kommentar</label><select id="e_spiel" onchange="document.getElementById('e_komGrp').style.display=this.value==='Sonstiges'?'block':'none'">
+    <option value="">–</option><option>HoSchnaWa</option><option>5er Spiel</option><option value="Sonstiges">Sonstiges</option></select></div>
+  <div class="fg" id="e_komGrp" style="display:none"><label>Kommentar</label><input class="tinput" id="e_kom" placeholder="z.B. Strafe"></div>
+  <button class="btn full" onclick="doEinzel(val('e_getr'),val('e_trinkt'),val('e_bez'),parseInt(val('e_anz')),val('e_spiel'),val('e_kom'));closeSheet()">Hinzufügen</button>`); }
+
+/* ---------- 5er / Log Aktionen ---------- */
+function toggleBestellt(id){ const f=data.fuenferSpiel.find(f=>f.id===id); if(f){f.bestellt=!f.bestellt; save(); render();} }
+function delFuenfer(id){
+  askConfirm("5er-Shot löschen? Der zugehörige Ledger-Eintrag geht mit.", ()=>{
+    const f=data.fuenferSpiel.find(f=>f.id===id);
+    data.fuenferSpiel=data.fuenferSpiel.filter(f=>f.id!==id);
+    if(f&&f.eintragId) data.eintraege=data.eintraege.filter(e=>e.id!==f.eintragId);
+    save(); render();
+  });
+}
+function delEintrag(id){ askConfirm("Eintrag löschen?", ()=>{ data.eintraege=data.eintraege.filter(e=>e.id!==id); save(); render(); }); }
+
+/* ---------- Setup Aktionen ---------- */
+function addPerson(){ const v=(val("npName")||"").trim(); if(!v) return; if(data.personen.includes(v)){toast("Existiert bereits");return;} data.personen.push(v); save(); render(); }
+function delPerson(i){ const name=data.personen[i]; askConfirm(`${name} löschen?`, ()=>{ data.personen.splice(i,1); data.gaeste=data.gaeste.filter(g=>g!==name); save(); render(); }); }
+function toggleGast(i){ const name=data.personen[i]; if(isGast(name)) data.gaeste=data.gaeste.filter(g=>g!==name); else data.gaeste.push(name); save(); render(); }
+function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ data.eintraege=[]; data.fuenferSpiel=[]; undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
+
+/* ---------- Export / Import ---------- */
+function exportData(){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="kegeldeckel_"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast("Exportiert");
+}
+function importData(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ let imp; try{
+      imp=JSON.parse(r.result);
+      if(!imp.personen||!imp.getraenke) throw 0;
+    }catch(e){ toast("Datei konnte nicht gelesen werden"); input.value=""; return; }
+    askConfirm("Import überschreibt den aktuellen Abend. Fortfahren?", ()=>{
+      imp.eintraege=imp.eintraege||[]; imp.fuenferSpiel=imp.fuenferSpiel||[]; imp.gaeste=imp.gaeste||[];
+      imp.eintraege.forEach(e=>{if(!e.id)e.id=uid();}); imp.fuenferSpiel.forEach(x=>{if(!x.id)x.id=uid();});
+      data=imp; undoStack=[]; save(); render(); toast("Importiert");
+    }, "Importieren");
+    input.value="";
+  };
+  r.readAsText(f); input.value="";
+}
+
+/* ---------- UI ---------- */
+function setView(v){ view=v; closeSheet(); render(); document.getElementById("main").scrollTop=0; }
+let tT;
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"),1500); }
+let confirmCb=null;
+function askConfirm(msg, cb, okLabel){
+  confirmCb=cb;
+  document.getElementById("cfMsg").textContent=msg;
+  document.getElementById("cfOk").textContent=okLabel||"Löschen";
+  document.getElementById("cfOverlay").classList.add("on");
+}
+function cfYes(){ document.getElementById("cfOverlay").classList.remove("on"); const cb=confirmCb; confirmCb=null; if(cb) cb(); }
+function cfNo(){ document.getElementById("cfOverlay").classList.remove("on"); confirmCb=null; }
+
+render();
+</script>
+</body>
+</html>
