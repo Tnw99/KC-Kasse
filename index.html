@@ -175,6 +175,75 @@
   .toast.show{opacity:1}
   svg.t line{stroke:var(--chalk); stroke-width:2.4; stroke-linecap:round}
   svg.t line.cross{stroke:var(--amber)}
+
+  /* Auflösung / Reveal */
+  .revealoverlay{position:fixed; inset:0; z-index:100; display:none;
+    background:radial-gradient(120% 80% at 50% 0%, #24443a 0%, #16231e 55%, #0f1a15 100%);
+    padding:calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px);
+    overflow:hidden}
+  .revealoverlay.on{display:block}
+  .revealbody{height:100%; display:flex; flex-direction:column; align-items:center; position:relative}
+  .revealbody.shake{animation:shake .55s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+  .beams{position:absolute; inset:-40% -40% auto -40%; height:150%; pointer-events:none; opacity:.5;
+    background:repeating-conic-gradient(from 0deg at 50% 0%, rgba(230,178,74,.14) 0deg 8deg, transparent 8deg 22deg);
+    animation:spin 14s linear infinite; transform-origin:50% 0%}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spot{position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(60% 40% at 50% 22%, rgba(242,239,230,.10), transparent 70%)}
+  .revclose{position:absolute; top:0; right:0; background:var(--bg2); border:1px solid var(--line);
+    color:var(--chalk); width:40px; height:40px; border-radius:12px; font-size:1.3rem; z-index:6}
+  .revmute{position:absolute; top:0; left:0; background:var(--bg2); border:1px solid var(--line);
+    color:var(--chalk); width:40px; height:40px; border-radius:12px; font-size:1.1rem; z-index:6}
+  .revtitle{font-size:1.7rem; font-weight:900; letter-spacing:.5px; text-align:center; margin-top:6vh; position:relative}
+  .revtitle.glow{animation:glow 1.6s ease-in-out infinite; color:var(--amber)}
+  @keyframes glow{50%{text-shadow:0 0 18px rgba(230,178,74,.8),0 0 34px rgba(230,178,74,.5)}}
+  .rsub{color:var(--dim); text-align:center; margin:8px 0 26px; position:relative}
+  .revchoices{display:flex; flex-direction:column; gap:14px; width:100%; max-width:360px; margin-top:4vh; position:relative}
+  .revbig{background:var(--bg2); border:1px solid var(--line); color:var(--chalk); font-family:inherit;
+    border-radius:18px; padding:24px; font-size:1.15rem; font-weight:700; display:flex; align-items:center; gap:16px}
+  .revbig span{flex:1; text-align:left}
+  .revbig:active{transform:scale(.98); background:var(--bg3)}
+  .countdown{font-size:5rem; font-weight:900; color:var(--amber); margin:auto; text-shadow:0 0 30px rgba(230,178,74,.6)}
+  .countdown.bump{animation:bump .5s ease}
+  @keyframes bump{0%{transform:scale(.3); opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1); opacity:1}}
+  .rstatus{font-size:1.4rem; font-weight:800; text-align:center; margin:14px 0 4px; min-height:1.6em;
+    color:var(--amber); position:relative}
+  .revcompare{position:relative; text-align:center; margin-top:6px; max-width:340px;
+    background:rgba(224,122,95,.12); border:1px solid var(--red); border-radius:14px; padding:12px 14px;
+    opacity:0; transform:translateY(8px); transition:opacity .5s, transform .5s}
+  .revcompare.show{opacity:1; transform:none}
+  .rc-head{font-weight:800; font-size:.9rem; margin-bottom:8px; color:var(--red)}
+  .rc-line{font-size:1rem; padding:2px 0}
+  .podium{display:flex; align-items:flex-end; justify-content:center; gap:12px;
+    width:100%; max-width:440px; margin-top:auto; margin-bottom:8vh; position:relative}
+  .pcol{width:31%; display:flex; flex-direction:column; align-items:center; justify-content:flex-end}
+  .pcol .who{opacity:0; transform:translateY(18px) scale(.9); transition:opacity .5s ease, transform .5s cubic-bezier(.2,.9,.3,1.3); text-align:center; margin-bottom:8px; position:relative}
+  .pcol.show .who{opacity:1; transform:none}
+  .ava{width:52px; height:52px; border-radius:50%; margin:0 auto 6px; background-size:cover; background-position:center;
+    display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:1.1rem;
+    border:2px solid rgba(242,239,230,.25)}
+  .ava.big{width:74px; height:74px; font-size:1.5rem; border-color:var(--amber); box-shadow:0 0 22px rgba(230,178,74,.6)}
+  .ava.sm{width:38px; height:38px; font-size:.9rem; margin:0}
+  .avaup{flex:0 0 auto; cursor:pointer}
+  .crown{position:absolute; top:-20px; left:50%; transform:translateX(-50%); font-size:1.5rem; animation:bob 1.4s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateX(-50%) translateY(-4px)}}
+  .who .wname{font-weight:800; font-size:1.02rem; line-height:1.1}
+  .who .wval{color:var(--dim); font-size:.85rem; margin-top:2px; font-weight:700}
+  .pcol.winner .who .wname{color:var(--amber); font-size:1.15rem}
+  .ped{width:100%; height:0; border-radius:12px 12px 0 0; display:flex; align-items:flex-start; justify-content:center;
+    padding-top:10px; font-size:1.7rem; color:#1a1108; overflow:hidden;
+    transition:height 1.7s cubic-bezier(.25,.8,.3,1)}
+  .pcol.winner .ped{box-shadow:0 0 30px rgba(230,178,74,.7)}
+  .pcol.show .ped{height:var(--h)}
+  .revactions{display:flex; gap:10px; justify-content:center; width:100%; max-width:360px;
+    position:absolute; bottom:2vh; opacity:0; transition:opacity .4s}
+  .revactions.show{opacity:1}
+  .revactions .btn{flex:1}
+  .confetti{position:absolute; top:-24px; width:9px; height:14px; border-radius:2px; z-index:3;
+    animation:fall linear forwards}
+  .confetti.emoji{width:auto; height:auto; font-size:1.4rem; border-radius:0}
+  @keyframes fall{to{transform:translateY(115vh) rotate(var(--rot,720deg)); opacity:.85}}
 </style>
 </head>
 <body>
@@ -205,6 +274,10 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="revealoverlay" id="revealOverlay">
+  <div class="revealbody" id="revealBody"></div>
+</div>
+
 <div class="overlay center" id="cfOverlay" onclick="if(event.target===this)cfNo()">
   <div class="cfbox">
     <div class="cfmsg" id="cfMsg"></div>
@@ -229,7 +302,7 @@ let undoStack=[]; // [{entryIds:[], fuenferId?}]
 
 function seed(){
   return {
-    personen:["Jerry","Luiz","Mats","Flo"], gaeste:[],
+    personen:["Jerry","Luiz","Mats","Flo"], gaeste:[], avatars:{},
     getraenke:[
       {name:"Jägermeister",preis:2.00,vol:35,ml:20},{name:"Klopfer",preis:1.50,vol:15,ml:20},{name:"Tequila",preis:2.50,vol:38,ml:20},
       {name:"Vodka",preis:2.00,vol:40,ml:20},{name:"Obstler",preis:1.80,vol:40,ml:20},{name:"Ouzo",preis:2.20,vol:37,ml:20},
@@ -243,7 +316,7 @@ function load(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY));
     if(s&&s.personen&&s.getraenke){
-      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[];
+      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{};
       s.eintraege.forEach(e=>{if(!e.id)e.id=uid();});
       s.fuenferSpiel.forEach(f=>{if(!f.id)f.id=uid();});
       return s;
@@ -259,8 +332,16 @@ function isGast(name){ return data.gaeste.includes(name); }
 function alkOf(name){ const g=drinkOf(name); if(!g||!g.vol||!g.ml) return 0; return g.ml*(g.vol/100)*0.789; }
 function alkFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl*alkOf(e.getraenk),0); }
 function anzFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl,0); }
+function payFor(name){ return r2(data.eintraege.filter(e=>e.bezahlt===name).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
 function bierRundenCount(){ const set=new Set(); data.eintraege.forEach(e=>{ if(e.spielinfo&&e.spielinfo.startsWith("Bier-Runde")) set.add(e.spielinfo); }); return set.size; }
 function hatAlkDaten(){ return data.getraenke.some(g=>g.vol&&g.ml); }
+function avatarColor(name){ let h=0; for(let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h); return `hsl(${Math.abs(h)%360} 45% 40%)`; }
+function initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||"")[0]||"").toUpperCase()+((p[1]||"")[0]||"").toUpperCase(); }
+function avatarHtml(name, cls){
+  const img=data.avatars[name];
+  if(img) return `<div class="ava ${cls||''}" style="background-image:url('${img}')"></div>`;
+  return `<div class="ava ${cls||''}" style="background:${avatarColor(name)}">${esc(initials(name)||"?")}</div>`;
+}
 function grand(){ return r2(data.eintraege.filter(e=>e.bezahlt).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
 function offenSumme(){ return r2(data.eintraege.filter(e=>!e.bezahlt).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
 
@@ -407,7 +488,8 @@ function vKasse(){
   data.eintraege.forEach(e=>{ if(anzahl[e.trinkt]!==undefined) anzahl[e.trinkt]+=e.anzahl; });
   const top3=data.personen.map(p=>({p,n:anzahl[p]})).sort((a,b)=>b.n-a.n).slice(0,3);
   const medals=["🥇","🥈","🥉"];
-  let html=`<h2 style="display:flex;justify-content:space-between;align-items:baseline">Meiste Getränke <span onclick="sheetRanking('anz')" style="color:var(--amber);text-transform:none;letter-spacing:0;cursor:pointer">Alle ›</span></h2>
+  let html=`<button class="btn full" style="margin-bottom:16px;background:linear-gradient(90deg,#e6b24a,#d98a44)" onclick="openReveal()">🏆 Auflösung starten</button>`;
+  html+=`<h2 style="display:flex;justify-content:space-between;align-items:baseline">Meiste Getränke <span onclick="sheetRanking('anz')" style="color:var(--amber);text-transform:none;letter-spacing:0;cursor:pointer">Alle ›</span></h2>
     <div class="top3" onclick="sheetRanking('anz')">`+
     top3.map((x,i)=>`<div class="t"><div class="m">${medals[i]}</div><div class="n">${esc(x.p)}${isGast(x.p)?' <span class="gastbadge">G</span>':''}</div><div class="c">${x.n} Stück</div></div>`).join("")+`</div>`;
 
@@ -520,6 +602,7 @@ function vLog(){
 
 function vSetup(){
   const persons=data.personen.map((p,i)=>`<div class="item">
+      <label class="avaup">${avatarHtml(p,'sm')}<input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(${i},this)"></label>
       <span class="name">${esc(p)}${isGast(p)?' <span class="gastbadge">Gast</span>':''}</span>
       <button class="gasttog ${isGast(p)?'on':''}" onclick="toggleGast(${i})">Gast</button>
       <button class="del" onclick="delPerson(${i})">×</button></div>`).join("")||`<p class="hint">Keine Personen.</p>`;
@@ -532,7 +615,7 @@ function vSetup(){
   return `
     <h2>Personen</h2>${persons}
     <div class="add"><input id="npName" placeholder="Neue Person" autocomplete="off"><button class="btn" onclick="addPerson()">+</button></div>
-    <p class="hint">Tipp „Gast" markiert Personen, die nicht fest dabei sind (Badge in Kasse &amp; Rangliste).</p>
+    <p class="hint">Tipp „Gast" markiert Personen, die nicht fest dabei sind. Auf den Kreis tippen, um ein Gesicht/Foto hochzuladen (erscheint bei der Auflösung).</p>
     <h2>Getränke &amp; Preise</h2>${drinks}
     <button class="btn full" style="margin-top:6px" onclick="sheetDrink(-1)">+ Getränk hinzufügen</button>
     <p class="hint">Getränk antippen zum Bearbeiten. %vol und ml sind optional – nur nötig für die Alkohol-Rangliste.</p>
@@ -621,7 +704,20 @@ function delEintrag(id){ askConfirm("Eintrag löschen?", ()=>{ data.eintraege=da
 
 /* ---------- Setup Aktionen ---------- */
 function addPerson(){ const v=(val("npName")||"").trim(); if(!v) return; if(data.personen.includes(v)){toast("Existiert bereits");return;} data.personen.push(v); save(); render(); }
-function delPerson(i){ const name=data.personen[i]; askConfirm(`${name} löschen?`, ()=>{ data.personen.splice(i,1); data.gaeste=data.gaeste.filter(g=>g!==name); save(); render(); }); }
+function delPerson(i){ const name=data.personen[i]; askConfirm(`${name} löschen?`, ()=>{ data.personen.splice(i,1); data.gaeste=data.gaeste.filter(g=>g!==name); delete data.avatars[name]; save(); render(); }); }
+function uploadAvatar(i, input){
+  const f=input.files[0]; if(!f) return; const name=data.personen[i];
+  const rd=new FileReader();
+  rd.onload=()=>{ const img=new Image(); img.onload=()=>{
+    const s=160, cv=document.createElement("canvas"); cv.width=s; cv.height=s;
+    const ctx=cv.getContext("2d");
+    const side=Math.min(img.width,img.height), sx=(img.width-side)/2, sy=(img.height-side)/2;
+    ctx.drawImage(img, sx, sy, side, side, 0, 0, s, s);
+    try{ data.avatars[name]=cv.toDataURL("image/jpeg",0.82); save(); render(); }
+    catch(e){ toast("Bild zu groß"); }
+  }; img.onerror=()=>toast("Bild ungültig"); img.src=rd.result; };
+  rd.readAsDataURL(f); input.value="";
+}
 function toggleGast(i){ const name=data.personen[i]; if(isGast(name)) data.gaeste=data.gaeste.filter(g=>g!==name); else data.gaeste.push(name); save(); render(); }
 function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ data.eintraege=[]; data.fuenferSpiel=[]; undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
 
@@ -663,6 +759,161 @@ function askConfirm(msg, cb, okLabel){
 }
 function cfYes(){ document.getElementById("cfOverlay").classList.remove("on"); const cb=confirmCb; confirmCb=null; if(cb) cb(); }
 function cfNo(){ document.getElementById("cfOverlay").classList.remove("on"); confirmCb=null; }
+
+/* ---------- Auflösung (Kahoot-Style, over the top) ---------- */
+let revealTimers=[], revealMuted=false, actx=null;
+function clearRevealTimers(){ revealTimers.forEach(clearTimeout); revealTimers=[]; }
+function tmr(fn,ms){ revealTimers.push(setTimeout(fn,ms)); }
+function setRevealBody(html){ document.getElementById("revealBody").innerHTML=html; }
+function closeReveal(){ clearRevealTimers(); document.getElementById("revealOverlay").classList.remove("on"); }
+
+/* --- Audio (synthetisch, ohne Dateien) --- */
+function audio(){ if(revealMuted) return null; try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==="suspended") actx.resume(); return actx; }catch(e){ return null; } }
+function beep(freq,start,dur,type,gain){ const c=audio(); if(!c) return; const t=c.currentTime+start; const o=c.createOscillator(),g=c.createGain(); o.type=type||"sine"; o.frequency.value=freq; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain||.2,t+.02); g.gain.exponentialRampToValueAtTime(.001,t+dur); o.start(t); o.stop(t+dur+.05); }
+function noise(start,dur,hp,gain){ const c=audio(); if(!c) return; const sr=c.sampleRate,len=Math.max(1,sr*dur),buf=c.createBuffer(1,len,sr),d=buf.getChannelData(0); for(let i=0;i<len;i++){ const env=Math.exp(-i/(sr*(dur*.4))); d[i]=(Math.random()*2-1)*env; } const src=c.createBufferSource(); src.buffer=buf; const f=c.createBiquadFilter(); f.type="highpass"; f.frequency.value=hp||1200; const g=c.createGain(); g.gain.value=gain||.3; src.connect(f); f.connect(g); g.connect(c.destination); src.start(c.currentTime+start); }
+function drumroll(dur){ const c=audio(); if(!c) return; const sr=c.sampleRate,len=sr*dur,buf=c.createBuffer(1,len,sr),d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1; const src=c.createBufferSource(); src.buffer=buf; const bp=c.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=170; bp.Q.value=1.1; const trem=c.createGain(); const lfo=c.createOscillator(),lg=c.createGain(); lfo.frequency.value=17; lg.gain.value=.6; lfo.connect(lg); lg.connect(trem.gain); const out=c.createGain(); const t=c.currentTime; out.gain.setValueAtTime(.04,t); out.gain.linearRampToValueAtTime(.5,t+dur); src.connect(bp); bp.connect(trem); trem.connect(out); out.connect(c.destination); src.start(t); lfo.start(t); src.stop(t+dur+.05); lfo.stop(t+dur+.05); }
+function fanfare(){ [[523,0],[659,.13],[784,.26],[1047,.42]].forEach(([f,s])=>{ beep(f,s,.5,"square",.16); beep(f/2,s,.5,"triangle",.08); }); noise(.4,1.8,1600,.28); }
+function pop(){ beep(880,0,.06,"square",.13); }
+function cdBeep(hi){ beep(hi?1046:660,0,.14,hi?"square":"sine",.22); }
+
+const WINNER_TITLES={
+  pay:["Zahlemann des Abends 💸","Der Sponsor 🤑","Investor des Vertrauens 🏦","Herr der Kasse 👑","Big Spender 💰"],
+  alk:["Die Kegel-Legende 🍺","Der Vernichter ☠️","Alkohol-Titan 🔥","Fass ohne Boden 🛢️","Unkaputtbar 💪"]
+};
+
+function muteBtn(){ return `<button class="revmute" onclick="revealMuted=!revealMuted;this.textContent=revealMuted?'🔇':'🔊'">${revealMuted?'🔇':'🔊'}</button>`; }
+function stage(){ return `<div class="beams"></div><div class="spot"></div>`; }
+
+function openReveal(){
+  clearRevealTimers(); audio();
+  const alkBtn=hatAlkDaten()?`<button class="revbig" onclick="startReveal('alk')">🥃<span>Meister Alkohol</span></button>`:"";
+  setRevealBody(`${stage()}
+    <button class="revclose" onclick="closeReveal()">×</button>${muteBtn()}
+    <div class="revtitle glow">🏆 DIE AUFLÖSUNG</div>
+    <p class="rsub">Wer räumt heute ab? Kategorie wählen:</p>
+    <div class="revchoices">
+      <button class="revbig" onclick="startReveal('pay')">💶<span>Meiste Ausgaben</span></button>
+      ${alkBtn}
+    </div>`);
+  document.getElementById("revealOverlay").classList.add("on");
+}
+
+function startReveal(mode){
+  clearRevealTimers(); audio();
+  const isPay=mode==="pay";
+  const rank=data.personen.map(p=>({p,v:isPay?payFor(p):alkFor(p)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,3);
+  const title=isPay?"💶 Meiste Ausgaben":"🥃 Meister Alkohol";
+  if(!rank.length){
+    setRevealBody(`${stage()}<button class="revclose" onclick="closeReveal()">×</button>
+      <div class="revtitle">${title}</div><p class="rsub">Dafür gibt es noch keine Daten.</p>
+      <div class="revchoices"><button class="revbig" onclick="openReveal()">◀ Zurück</button></div>`);
+    return;
+  }
+  /* Countdown 3-2-1 */
+  setRevealBody(`${stage()}<button class="revclose" onclick="closeReveal()">×</button>${muteBtn()}
+    <div class="revtitle">${title}</div>
+    <div class="countdown" id="cd">3</div>`);
+  const cd=()=>document.getElementById("cd");
+  cdBeep(false);
+  tmr(()=>{ if(cd()){cd().textContent="2"; cd().classList.remove("bump"); void cd().offsetWidth; cd().classList.add("bump");} cdBeep(false); },700);
+  tmr(()=>{ if(cd()){cd().textContent="1"; cd().classList.remove("bump"); void cd().offsetWidth; cd().classList.add("bump");} cdBeep(false); },1400);
+  tmr(()=>{ if(cd()){cd().textContent="LOS!"; cd().classList.add("bump");} cdBeep(true); },2100);
+  tmr(()=>runPodium(isPay, rank, title),2800);
+}
+
+function runPodium(isPay, rank, title){
+  const fmtV=v=>isPay?fmt(r2(v)):`${v.toFixed(0)} g`;
+  const pedColors=["#e6b24a","#c9d1d0","#cd7f4d"], heights=[160,116,84], medals=["🥇","🥈","🥉"], order=[1,0,2];
+  const cols=order.map(idx=>{
+    if(!rank[idx]) return `<div class="pcol"></div>`;
+    const winner=idx===0?"winner":"";
+    return `<div class="pcol ${winner}" id="col${idx}">
+      <div class="who">
+        ${idx===0?'<div class="crown">👑</div>':''}
+        ${avatarHtml(rank[idx].p, idx===0?'big':'')}
+        <div class="wname">${esc(rank[idx].p)}</div>
+        <div class="wval" data-target="${rank[idx].v}" data-money="${isPay?1:0}">${idx===0?'0':fmtV(rank[idx].v)}</div>
+      </div>
+      <div class="ped" style="--h:${heights[idx]}px; background:${pedColors[idx]}">${medals[idx]}</div>
+    </div>`;
+  }).join("");
+  setRevealBody(`${stage()}
+    <button class="revclose" onclick="closeReveal()">×</button>${muteBtn()}
+    <div class="revtitle">${title}</div>
+    <div class="rstatus" id="rstatus">🥁 Trommelwirbel …</div>
+    <div class="revcompare" id="revcompare"></div>
+    <div class="podium">${cols}</div>
+    <div class="revactions" id="revactions"></div>`);
+  drumroll(6.6);
+  const rs=()=>document.getElementById("rstatus");
+  const reveal=(idx,label)=>{ const el=document.getElementById("col"+idx); if(!el) return; el.classList.add("show"); pop();
+    const v=el.querySelector(".wval"); if(v){ countUp(v, +v.dataset.target, v.dataset.money==="1"); }
+    if(rs()&&rank[idx]) rs().textContent=label; };
+  tmr(()=>reveal(2,"🥉 Auf Platz 3 …"),1400);
+  tmr(()=>reveal(1,"🥈 Auf Platz 2 …"),4000);
+  tmr(()=>{
+    reveal(0,"🥇 "+ WINNER_TITLES[isPay?"pay":"alk"][Math.floor(Math.random()*5)]);
+    fanfare(); partyBlast();
+    const rb=document.getElementById("revealBody"); if(rb){ rb.classList.add("shake"); setTimeout(()=>rb.classList.remove("shake"),600); }
+  },6600);
+  if(!isPay){
+    tmr(()=>{
+      const rc=document.getElementById("revcompare"); if(!rc||!rank[0]) return;
+      rc.innerHTML=`<div class="rc-head">${esc(rank[0].p)}s ${rank[0].v.toFixed(0)} g reiner Alkohol ≈</div>`+
+        alkVergleich(rank[0].v).map(l=>`<div class="rc-line">${l}</div>`).join("");
+      rc.classList.add("show");
+    },7400);
+  }
+  tmr(()=>{
+    const act=document.getElementById("revactions"); if(!act) return;
+    let btns=`<button class="btn ghost" onclick="openReveal()">◀ Auswahl</button>`;
+    if(isPay && hatAlkDaten()) btns=`<button class="btn" onclick="startReveal('alk')">🥃 Alkohol ›</button>`+btns;
+    act.innerHTML=btns; act.classList.add("show");
+  },isPay?7400:8200);
+}
+
+/* anschauliche Vergleichswerte für g reinen Alkohol
+   Basis: reiner Alkohol = ml × %vol × 0,789 g/ml */
+function alkVergleich(g){
+  const koepi=g/12.76;       // 0,33 l Köpi Pils @ 4,9 %  (330·0,049·0,789)
+  const trinkzwei=g/2.367;   // je Shot 2 cl Trinkzwei @ 15 %  (20·0,15·0,789)
+  const vodka=g/5.9175;      // je Shot 2 cl Vodka @ 37,5 %    (20·0,375·0,789)
+  const kcal=g*7;            // ~7 kcal je g Alkohol
+  const n1=v=>v.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1});
+  return [
+    `🍺 ${n1(koepi)} × 0,33 l Köpi (Pils)`,
+    `🥃 ${Math.round(trinkzwei)} Shots Trinkzwei (2 cl · 15 %)`,
+    `🍸 ${Math.round(vodka)} Shots Vodka (2 cl · 37,5 %)`,
+    `🔥 ~${Math.round(kcal)} kcal nur aus Alkohol`
+  ];
+}
+
+function countUp(el, target, money){
+  const dur=1700, t0=performance.now();
+  const step=now=>{ const k=Math.min(1,(now-t0)/dur); const val=target*(1-Math.pow(1-k,3));
+    el.textContent=money?fmt(r2(val)):`${Math.round(val)} g`;
+    if(k<1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+function partyBlast(){
+  const wrap=document.getElementById("revealBody"); if(!wrap) return;
+  const colors=["#e6b24a","#68b684","#e07a5f","#f2efe6","#c9d1d0","#7aa2ff"];
+  const emojis=["🍺","🥃","🎉","👑","⭐","🍻"];
+  for(let i=0;i<90;i++){
+    const isEmoji=Math.random()<0.28;
+    const d=document.createElement("div");
+    d.className=isEmoji?"confetti emoji":"confetti";
+    d.style.left=Math.random()*100+"%";
+    if(isEmoji){ d.textContent=emojis[Math.floor(Math.random()*emojis.length)]; }
+    else{ d.style.background=colors[i%colors.length]; d.style.width=(6+Math.random()*6)+"px"; d.style.height=(10+Math.random()*8)+"px"; }
+    d.style.animationDelay=(Math.random()*0.5)+"s";
+    d.style.animationDuration=(1.8+Math.random()*1.8)+"s";
+    d.style.setProperty("--rot", (Math.random()*720-360)+"deg");
+    wrap.appendChild(d);
+    setTimeout(()=>d.remove(),4200);
+  }
+}
 
 render();
 </script>
