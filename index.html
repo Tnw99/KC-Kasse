@@ -261,6 +261,11 @@
 
 <main id="main"></main>
 
+<div id="savewarn" style="display:none; position:fixed; top:calc(env(safe-area-inset-top) + 68px); left:16px; right:16px; z-index:70;
+  background:#5c2a20; border:1px solid var(--red); color:var(--chalk); border-radius:12px; padding:10px 14px; font-size:.85rem; font-weight:600">
+  ⚠️ Speichern fehlgeschlagen! Bitte sofort im Setup „Abend exportieren" nutzen, um nichts zu verlieren.
+</div>
+
 <nav>
   <button data-v="aktionen" class="on" onclick="setView('aktionen')">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Aktionen</button>
@@ -308,7 +313,7 @@ let undoStack=[]; // [{entryIds:[], fuenferId?}]
 
 function seed(){
   return {
-    personen:["Jerry","Luiz","Mats","Flo"], gaeste:[], avatars:{},
+    personen:["Jerry","Luiz","Mats","Flo"], gaeste:[], avatars:{}, bierKasse:3,
     getraenke:[
       {name:"Jägermeister",preis:2.00,vol:35,ml:20},{name:"Klopfer",preis:1.50,vol:15,ml:20},{name:"Tequila",preis:2.50,vol:38,ml:20},
       {name:"Vodka",preis:2.00,vol:40,ml:20},{name:"Obstler",preis:1.80,vol:40,ml:20},{name:"Ouzo",preis:2.20,vol:37,ml:20},
@@ -322,7 +327,7 @@ function load(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY));
     if(s&&s.personen&&s.getraenke){
-      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{};
+      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3;
       s.eintraege.forEach(e=>{if(!e.id)e.id=uid();});
       s.fuenferSpiel.forEach(f=>{if(!f.id)f.id=uid();});
       return s;
@@ -330,7 +335,101 @@ function load(){
   }catch(e){}
   return seed();
 }
-function save(){ try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){} }
+/* ---------- Robustes Speichern: localStorage + IndexedDB-Spiegel + tägliche Backups ---------- */
+let idb=null;
+function idbOpen(){
+  return new Promise(res=>{
+    try{
+      const rq=indexedDB.open("kegeldeckel",1);
+      rq.onupgradeneeded=()=>rq.result.createObjectStore("kv");
+      rq.onsuccess=()=>res(rq.result);
+      rq.onerror=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+function idbPut(key,val){
+  if(!idb) return Promise.resolve(false);
+  return new Promise(res=>{
+    try{
+      const tx=idb.transaction("kv","readwrite");
+      tx.objectStore("kv").put(val,key);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false); tx.onabort=()=>res(false);
+    }catch(e){ res(false); }
+  });
+}
+function idbGet(key){
+  if(!idb) return Promise.resolve(null);
+  return new Promise(res=>{
+    try{
+      const rq=idb.transaction("kv","readonly").objectStore("kv").get(key);
+      rq.onsuccess=()=>res(rq.result||null);
+      rq.onerror=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+function idbKeys(){
+  if(!idb) return Promise.resolve([]);
+  return new Promise(res=>{
+    try{
+      const rq=idb.transaction("kv","readonly").objectStore("kv").getAllKeys();
+      rq.onsuccess=()=>res(rq.result||[]);
+      rq.onerror=()=>res([]);
+    }catch(e){ res([]); }
+  });
+}
+function idbDel(key){
+  if(!idb) return Promise.resolve();
+  return new Promise(res=>{
+    try{ const tx=idb.transaction("kv","readwrite"); tx.objectStore("kv").delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }
+    catch(e){ res(); }
+  });
+}
+function todayKey(){ return "backup-"+new Date().toISOString().slice(0,10); }
+function saveWarn(on){
+  const el=document.getElementById("savewarn");
+  if(el) el.style.display=on?"block":"none";
+}
+function save(){
+  const json=JSON.stringify(data);
+  let ok=false;
+  try{
+    localStorage.setItem(KEY,json);
+    ok=localStorage.getItem(KEY)===json; // Verifikation
+  }catch(e){ ok=false; }
+  if(!ok) saveWarn(true);
+  // Spiegel + Tagesbackup in IndexedDB (asynchron)
+  idbPut("current",json).then(idbOk=>{ saveWarn(!ok && !idbOk); });
+  idbGet(todayKey()).then(v=>{ if(v==null){ idbPut(todayKey(),json).then(()=>cleanupBackups()); } });
+}
+function cleanupBackups(){
+  idbKeys().then(keys=>{
+    const b=keys.filter(k=>String(k).startsWith("backup-")).sort();
+    while(b.length>7){ idbDel(b.shift()); }
+  });
+}
+async function initStorage(){
+  // Persistenten Speicher anfordern (Browser entscheidet)
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  idb=await idbOpen();
+  // Falls localStorage leer/kaputt, aber IndexedDB Daten hat: wiederherstellen
+  const lsEmpty=(()=>{ try{ const s=JSON.parse(localStorage.getItem(KEY)); return !(s&&s.personen&&s.getraenke); }catch(e){ return true; } })();
+  const hasEntries=data.eintraege.length||data.fuenferSpiel.length;
+  if(lsEmpty && !hasEntries){
+    const cur=await idbGet("current");
+    if(cur){
+      try{
+        const s=JSON.parse(cur);
+        if(s&&s.personen&&s.getraenke){
+          s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3;
+          data=s; save(); render(); toast("Daten aus Sicherung wiederhergestellt");
+        }
+      }catch(e){}
+    }
+  } else {
+    save(); // aktuellen Stand direkt in den Spiegel schreiben
+  }
+}
 function drinkOf(name){ return data.getraenke.find(g=>g.name===name)||null; }
 function preisOf(name){ const g=drinkOf(name); return g?g.preis:0; }
 function isGast(name){ return data.gaeste.includes(name); }
@@ -381,7 +480,7 @@ function doBierRunde(){
   data.eintraege.forEach(e=>{ if(e.getraenk.toLowerCase()==="bier"&&cnt[e.trinkt]!==undefined) cnt[e.trinkt]+=e.anzahl; });
   pushEntries(data.personen.map(p=>{
     const n=cnt[p]+1;
-    return {getraenk:"Bier", trinkt:p, bezahlt:n<=3?"KASSE":p, anzahl:1, spielinfo:`Bier-Runde ${nr}`};
+    return {getraenk:"Bier", trinkt:p, bezahlt:n<=data.bierKasse?"KASSE":p, anzahl:1, spielinfo:`Bier-Runde ${nr}`};
   }));
   toast(`Bier-Runde ${nr} erstellt`);
 }
@@ -454,7 +553,7 @@ function vAktionen(){
       <button class="abtn wide accent" onclick="sheetEinzel()"><span class="ic">✏️</span>Einzelnes Getränk</button>
     </div>
     <p class="hint" style="margin-top:14px">Shot-Runde: der Starter (Alle 9) geht auf die Kasse, alle anderen zahlen selbst.
-    Bier-Runde: die ersten 3 Bier pro Person zahlt die Kasse, ab dem 4. selbst.
+    Bier-Runde: die ersten ${data.bierKasse} Bier pro Person zahlt die Kasse, danach selbst.
     Runde: zahlt komplett der Ausgebende.</p>`;
 }
 
@@ -640,13 +739,21 @@ function vSetup(){
     <h2>Getränke &amp; Preise</h2>${drinks}
     <button class="btn full" style="margin-top:6px" onclick="sheetDrink(-1)">+ Getränk hinzufügen</button>
     <p class="hint">Getränk antippen zum Bearbeiten. %vol und ml sind optional – nur nötig für die Alkohol-Rangliste.</p>
+    <h2>Regeln</h2>
+    <div class="item">
+      <span class="name">Freibier je Person (Kasse)</span>
+      <input class="price" type="number" inputmode="numeric" min="0" step="1" value="${data.bierKasse}" onchange="setBierKasse(this.value)">
+      <span class="unit">Bier</span>
+    </div>
+    <p class="hint">Bei einer Bier-Runde zahlt die Kasse pro Person so viele Bier, ab dann zahlt jede/r selbst. Standard: 3.</p>
     <h2>Daten</h2>
     <div class="stack">
       <button class="btn ghost" onclick="exportData()">Abend exportieren (JSON)</button>
       <label class="btn ghost" style="text-align:center">Import (JSON)<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
+      <button class="btn ghost" onclick="sheetBackups()">Automatische Sicherungen ansehen</button>
       <button class="btn danger" onclick="resetAbend()">Abend zurücksetzen</button>
     </div>
-    <p class="hint">„Abend zurücksetzen" löscht alle Einträge &amp; 5er-Shots — Personen und Preise bleiben.</p>`;
+    <p class="hint">Die App sichert jede Änderung doppelt (localStorage + IndexedDB) und legt täglich automatisch ein Backup an (letzte 7 Tage). „Abend zurücksetzen" löscht alle Einträge &amp; 5er-Shots — Personen und Preise bleiben.</p>`;
 }
 function sheetDrink(i){
   const g=i>=0?data.getraenke[i]:{name:"",preis:"",vol:"",ml:""};
@@ -673,6 +780,37 @@ function saveDrink(i){
 }
 function delGetraenkSheet(i){ const name=data.getraenke[i].name; askConfirm(`${name} löschen?`, ()=>{ data.getraenke.splice(i,1); save(); render(); closeSheet(); }); }
 
+/* ---------- Automatische Sicherungen (IndexedDB) ---------- */
+function sheetBackups(){
+  idbKeys().then(keys=>{
+    const b=keys.filter(k=>String(k).startsWith("backup-")).sort().reverse();
+    const hasPre=keys.includes("pre-change");
+    let rows="";
+    if(hasPre) rows+=`<div class="lrow" style="border-color:var(--amber)"><div class="grow"><div class="tt">Stand vor letztem Zurücksetzen/Import</div></div>
+        <button class="btn" style="padding:9px 14px;font-size:.85rem" onclick="restoreBackup('pre-change')">Laden</button></div>`;
+    rows+=b.map(k=>{
+      const d=String(k).slice(7);
+      return `<div class="lrow"><div class="grow"><div class="tt">Sicherung vom ${d}</div></div>
+        <button class="btn" style="padding:9px 14px;font-size:.85rem" onclick="restoreBackup('${k}')">Laden</button></div>`;
+    }).join("");
+    if(!rows) rows=`<p class="hint">Noch keine automatischen Sicherungen vorhanden. Sie entstehen bei der ersten Änderung an einem Tag.</p>`;
+    openSheet(head("Automatische Sicherungen")+
+      `<p class="hint" style="margin-bottom:12px">Beim ersten Speichern eines Tages wird der Stand gesichert (letzte 7 Tage). Vor „Abend zurücksetzen" und Import wird zusätzlich der vorherige Stand aufgehoben. „Laden" ersetzt den aktuellen Stand.</p>`+rows);
+  });
+}
+function restoreBackup(key){
+  idbGet(key).then(json=>{
+    if(!json){ toast("Sicherung nicht lesbar"); return; }
+    let s; try{ s=JSON.parse(json); if(!s.personen||!s.getraenke) throw 0; }catch(e){ toast("Sicherung nicht lesbar"); return; }
+    const label=key==="pre-change"?"Stand vor letztem Zurücksetzen/Import":"Sicherung vom "+String(key).slice(7);
+    askConfirm(`${label} laden? Der aktuelle Stand wird ersetzt.`, ()=>{
+      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3;
+      s.eintraege.forEach(e=>{if(!e.id)e.id=uid();}); s.fuenferSpiel.forEach(x=>{if(!x.id)x.id=uid();});
+      data=s; undoStack=[]; save(); render(); closeSheet(); toast("Sicherung geladen");
+    }, "Laden");
+  });
+}
+
 /* ---------- Sheets ---------- */
 function opts(list){ return list.map(x=>`<option>${esc(x)}</option>`).join(""); }
 function personOpts(){ return opts(data.personen); }
@@ -688,7 +826,7 @@ function sheetShot(){ openSheet(head("Shot-Runde")+`
   <button class="btn full" onclick="doShotRunde(val('s_shot'),val('s_starter'));closeSheet()">Erstellen</button>`); }
 
 function sheetBier(){ openSheet(head("Bier-Runde")+`
-  <p class="hint" style="margin-bottom:14px">Jede Person bekommt +1 Bier. Die ersten 3 Bier pro Person zahlt die Kasse, ab dem 4. selbst.</p>
+  <p class="hint" style="margin-bottom:14px">Jede Person bekommt +1 Bier. Die ersten ${data.bierKasse} Bier pro Person zahlt die Kasse, danach selbst.</p>
   <button class="btn full" onclick="doBierRunde();closeSheet()">Erstellen</button>`); }
 
 function sheetRunde(){ openSheet(head("Runde ausgeben")+`
@@ -740,7 +878,8 @@ function uploadAvatar(i, input){
   rd.readAsDataURL(f); input.value="";
 }
 function toggleGast(i){ const name=data.personen[i]; if(isGast(name)) data.gaeste=data.gaeste.filter(g=>g!==name); else data.gaeste.push(name); save(); render(); }
-function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ data.eintraege=[]; data.fuenferSpiel=[]; undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
+function setBierKasse(v){ const n=parseInt(v); if(isNaN(n)||n<0) return; data.bierKasse=n; save(); render(); }
+function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
 
 /* ---------- Export / Import ---------- */
 function exportData(){
@@ -758,7 +897,8 @@ function importData(input){
       if(!imp.personen||!imp.getraenke) throw 0;
     }catch(e){ toast("Datei konnte nicht gelesen werden"); input.value=""; return; }
     askConfirm("Import überschreibt den aktuellen Abend. Fortfahren?", ()=>{
-      imp.eintraege=imp.eintraege||[]; imp.fuenferSpiel=imp.fuenferSpiel||[]; imp.gaeste=imp.gaeste||[];
+      idbPut("pre-change",JSON.stringify(data));
+      imp.eintraege=imp.eintraege||[]; imp.fuenferSpiel=imp.fuenferSpiel||[]; imp.gaeste=imp.gaeste||[]; imp.avatars=imp.avatars||{}; if(imp.bierKasse==null) imp.bierKasse=3;
       imp.eintraege.forEach(e=>{if(!e.id)e.id=uid();}); imp.fuenferSpiel.forEach(x=>{if(!x.id)x.id=uid();});
       data=imp; undoStack=[]; save(); render(); toast("Importiert");
     }, "Importieren");
@@ -939,6 +1079,7 @@ function partyBlast(){
 }
 
 render();
+initStorage();
 </script>
 </body>
 </html>
