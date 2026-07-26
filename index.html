@@ -437,7 +437,27 @@ function isGast(name){ return data.gaeste.includes(name); }
 function alkOf(name){ const g=drinkOf(name); if(!g||!g.vol||!g.ml) return 0; return g.ml*(g.vol/100)*0.789; }
 function alkFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl*alkOf(e.getraenk),0); }
 function anzFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl,0); }
-function payFor(name){ return r2(data.eintraege.filter(e=>e.bezahlt===name).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
+/* Effektiver Zahler je Eintrag: Bier aus Bier-Runden geht bis zur aktuell eingestellten
+   Freibier-Zahl (bierKasse) auf die KASSE, darüber auf die Person selbst. Wird live berechnet,
+   damit ein Ändern der Einstellung rückwirkend gilt. Alle anderen Einträge behalten ihren Zahler. */
+function effPayers(){
+  const map={};
+  data.eintraege.forEach(e=>{ map[e.id]=e.bezahlt; });
+  data.personen.forEach(P=>{
+    const biers=data.eintraege
+      .filter(e=>e.trinkt===P && e.getraenk && e.getraenk.toLowerCase()==="bier")
+      .sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+    let n=0;
+    biers.forEach(e=>{
+      n+=e.anzahl||1;
+      if(e.spielinfo && e.spielinfo.startsWith("Bier-Runde")){
+        map[e.id]= n<=data.bierKasse ? "KASSE" : P;
+      }
+    });
+  });
+  return map;
+}
+function payFor(name){ const m=effPayers(); return r2(data.eintraege.filter(e=>m[e.id]===name).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0)); }
 function bierRundenCount(){ const set=new Set(); data.eintraege.forEach(e=>{ if(e.spielinfo&&e.spielinfo.startsWith("Bier-Runde")) set.add(e.spielinfo); }); return set.size; }
 function hatAlkDaten(){ return data.getraenke.some(g=>g.vol&&g.ml); }
 function avatarColor(name){ let h=0; for(let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h); return `hsl(${Math.abs(h)%360} 45% 40%)`; }
@@ -605,8 +625,9 @@ function vKasse(){
   html+=`<p class="hint" style="margin:-6px 0 12px">${gAnz} Getränke · 🍺 ${bierR} Bier-Runde${bierR===1?'':'n'}${offenZa?` · ${offenZa} 5er noch ohne Zahler`:""} · Kasse-Anteil unten aufgeschlüsselt</p>`;
 
   html+=`<h2>Pro Person (Zahler)</h2>`;
+  const m=effPayers();
   data.personen.forEach(p=>{
-    const items=data.eintraege.filter(e=>e.bezahlt===p);
+    const items=data.eintraege.filter(e=>m[e.id]===p);
     const badge=isGast(p)?' <span class="gastbadge">Gast</span>':'';
     if(!items.length){ html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">0,00 €</span></div><div class="sline">nichts zu zahlen · Details ›</div></div>`; return; }
     const c={}; items.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
@@ -616,7 +637,7 @@ function vKasse(){
     html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">${fmt(r2(tot))}</span></div>${lines}<div class="sline" style="color:var(--amber)">Details ›</div></div>`;
   });
 
-  const offen=data.eintraege.filter(e=>!e.bezahlt);
+  const offen=data.eintraege.filter(e=>!m[e.id]);
   if(offen.length){
     const c={}; offen.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
     let tot=0, lines="";
@@ -625,7 +646,7 @@ function vKasse(){
     html+=`<h2>Noch offen (kein Zahler)</h2><div class="scard pending"><div class="sh"><span>❓ Offen</span><span class="e">${fmt(r2(tot))}</span></div>${lines}</div>`;
   }
 
-  const kasse=data.eintraege.filter(e=>e.bezahlt==="KASSE");
+  const kasse=data.eintraege.filter(e=>m[e.id]==="KASSE");
   if(kasse.length){
     const c={}; kasse.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
     let tot=0, lines="";
@@ -657,8 +678,9 @@ function sheetPerson(name){
   const drunk=data.eintraege.filter(e=>e.trinkt===name);
   const getr=drunk.length?gameGroups(drunk,false,true):`<p class="hint">Noch nichts getrunken.</p>`;
   const anz=anzFor(name);
-  const payItems=data.eintraege.filter(e=>e.bezahlt===name);
-  const payTot=payFor(name);
+  const m=effPayers();
+  const payItems=data.eintraege.filter(e=>m[e.id]===name);
+  const payTot=r2(payItems.reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
   // Standard-Ansicht: nach Getränk zusammengefasst (wie zuvor)
   const pc={}; payItems.forEach(e=>pc[e.getraenk]=(pc[e.getraenk]||0)+e.anzahl);
   let payLines="";
@@ -709,13 +731,14 @@ function rankToggle(){
 
 function vLog(){
   if(!data.eintraege.length) return `<div class="empty">Noch keine Einträge.</div>`;
+  const m=effPayers();
   return [...data.eintraege].reverse().map(e=>`
     <div class="lrow">
       <div class="grow">
         <div class="tt">${e.anzahl>1?e.anzahl+"× ":""}${esc(e.getraenk)}${uhr(e.timestamp)?` <span style="color:var(--dim);font-weight:500;font-size:.82rem">${uhr(e.timestamp)}</span>`:""}</div>
-        <div class="sub">trinkt ${e.trinkt?esc(e.trinkt):"—"} · zahlt ${e.bezahlt?esc(e.bezahlt):"—"}${e.spielinfo?" · "+esc(e.spielinfo):""}</div>
+        <div class="sub">trinkt ${e.trinkt?esc(e.trinkt):"—"} · zahlt ${m[e.id]?esc(m[e.id]):"—"}${e.spielinfo?" · "+esc(e.spielinfo):""}</div>
       </div>
-      <span class="price">${e.bezahlt==="KASSE"?"Kasse":fmt(r2(e.anzahl*preisOf(e.getraenk)))}</span>
+      <span class="price">${m[e.id]==="KASSE"?"Kasse":fmt(r2(e.anzahl*preisOf(e.getraenk)))}</span>
       <button class="del" onclick="delEintrag('${e.id}')">×</button>
     </div>`).join("");
 }
@@ -878,7 +901,7 @@ function uploadAvatar(i, input){
   rd.readAsDataURL(f); input.value="";
 }
 function toggleGast(i){ const name=data.personen[i]; if(isGast(name)) data.gaeste=data.gaeste.filter(g=>g!==name); else data.gaeste.push(name); save(); render(); }
-function setBierKasse(v){ const n=parseInt(v); if(isNaN(n)||n<0) return; data.bierKasse=n; save(); render(); }
+function setBierKasse(v){ const n=parseInt(v); if(isNaN(n)||n<0) return; data.bierKasse=n; save(); render(); toast(`Freibier: ${n} pro Person – Kasse aktualisiert`); }
 function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
 
 /* ---------- Export / Import ---------- */
