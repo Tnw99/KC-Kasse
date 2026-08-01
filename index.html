@@ -617,6 +617,28 @@ function vFuenfer(){
     ${rows}`;
 }
 
+/* Rendert die Getränke-Zeilen einer Kasse-Karte (Person oder Kasse). Bestellte 5er-Shots zählen
+   ganz normal zur jeweiligen Getränkesumme; nur noch nicht bestellte werden separat und ausgegraut
+   aufgeführt, solange sie im 5er-Tab nicht abgehakt sind. */
+function renderKasseLines(items){
+  const offen=[], normal=[];
+  items.forEach(e=>{
+    if(e.spielinfo==="5er-Spiel"){
+      const f=data.fuenferSpiel.find(x=>x.eintragId===e.id);
+      if(f && !f.bestellt){ offen.push(e); return; }
+    }
+    normal.push(e);
+  });
+  const c={}; normal.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
+  let tot=0, lines="";
+  Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
+    lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
+  offen.forEach(e=>{
+    const sub=r2(e.anzahl*preisOf(e.getraenk)); tot+=sub;
+    lines+=`<div class="sline" style="opacity:.5"><span>🎲 ${esc(e.getraenk)} (nicht bestellt)</span><span>${fmt(sub)}</span></div>`;
+  });
+  return {tot:r2(tot), lines};
+}
 function vKasse(){
   if(!data.eintraege.length) return `<div class="empty">Noch nichts getrunken.</div>`;
   let html=`<button class="btn full" style="margin-bottom:16px;background:linear-gradient(90deg,#e6b24a,#d98a44);color:#1a1108" onclick="sheetRanking('anz')">📊 Auswertung</button>`;
@@ -633,11 +655,8 @@ function vKasse(){
     const items=data.eintraege.filter(e=>m[e.id]===p);
     const badge=isGast(p)?' <span class="gastbadge">Gast</span>':'';
     if(!items.length){ html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">0,00 €</span></div><div class="sline">nichts zu zahlen · Details ›</div></div>`; return; }
-    const c={}; items.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
-    let tot=0, lines="";
-    Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
-      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
-    html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">${fmt(r2(tot))}</span></div>${lines}<div class="sline" style="color:var(--amber)">Details ›</div></div>`;
+    const {tot,lines}=renderKasseLines(items);
+    html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">${fmt(tot)}</span></div>${lines}<div class="sline" style="color:var(--amber)">Details ›</div></div>`;
   });
 
   const offen=data.eintraege.filter(e=>!m[e.id]);
@@ -651,11 +670,8 @@ function vKasse(){
 
   const kasse=data.eintraege.filter(e=>m[e.id]==="KASSE");
   if(kasse.length){
-    const c={}; kasse.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
-    let tot=0, lines="";
-    Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
-      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
-    html+=`<h2>Kasse</h2><div class="scard kasse" onclick="sheetKasse()"><div class="sh"><span>🍻 Kasse</span><span class="e">${fmt(r2(tot))}</span></div>${lines}<div class="sline" style="color:var(--green)">Details ›</div></div>`;
+    const {tot,lines}=renderKasseLines(kasse);
+    html+=`<h2>Kasse</h2><div class="scard kasse" onclick="sheetKasse()"><div class="sh"><span>🍻 Kasse</span><span class="e">${fmt(tot)}</span></div>${lines}<div class="sline" style="color:var(--green)">Details ›</div></div>`;
   }
   return html;
 }
@@ -663,11 +679,8 @@ function vKasse(){
 function sheetKasse(){
   const m=effPayers();
   const kasseItems=data.eintraege.filter(e=>m[e.id]==="KASSE");
-  const tot=r2(kasseItems.reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
-  const c={}; kasseItems.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
-  let lines="";
-  Object.keys(c).sort().forEach(g=>{ lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(r2(c[g]*preisOf(g)))}</span></div>`; });
-  if(!kasseItems.length) lines=`<div class="sline">nichts auf der Kasse</div>`;
+  const {tot,lines:linesRaw}=renderKasseLines(kasseItems);
+  const lines=kasseItems.length?linesRaw:`<div class="sline">nichts auf der Kasse</div>`;
   const detail=kasseItems.length?`<div class="pdhead">Nach Spiel</div>${gameGroups(kasseItems,true,false)}`:"";
   openSheet(head("🍻 Kasse")+`
     <div class="scard paytoggle" onclick="this.classList.toggle('open')">
@@ -702,11 +715,9 @@ function sheetPerson(name){
   const payItems=data.eintraege.filter(e=>m[e.id]===name);
   const payTot=r2(payItems.reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
 
-  // MUSS ZAHLEN: nach Getränk zusammengefasst, aufklappbar nach Spiel
-  const pc={}; payItems.forEach(e=>pc[e.getraenk]=(pc[e.getraenk]||0)+e.anzahl);
-  let payLines="";
-  Object.keys(pc).sort().forEach(g=>{ payLines+=`<div class="sline"><span>${esc(g)} · ${pc[g]}×</span><span>${fmt(r2(pc[g]*preisOf(g)))}</span></div>`; });
-  if(!payItems.length) payLines=`<div class="sline">nichts zu zahlen</div>`;
+  // MUSS ZAHLEN: nach Getränk zusammengefasst, aufklappbar nach Spiel; 5er-Shots einzeln + ausgegraut solange unbestellt
+  const {tot:payTot2, lines:payLinesRaw}=renderKasseLines(payItems);
+  const payLines=payItems.length?payLinesRaw:`<div class="sline">nichts zu zahlen</div>`;
   const payDetail=payItems.length?`<div class="pdhead">Nach Spiel</div>${gameGroups(payItems,true,false)}`:"";
 
   // GETRUNKEN: gleicher Stil – nach Getränk zusammengefasst, aufklappbar nach Spiel
