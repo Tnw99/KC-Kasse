@@ -589,8 +589,8 @@ function vAktionen(){
 
 function vFuenfer(){
   const ges=data.fuenferSpiel.length;
-  const offenZa=data.fuenferSpiel.filter(f=>!f.bezahlt).length;
-  const offenTr=data.fuenferSpiel.filter(f=>!f.trinkt).length;
+  const bestellt=data.fuenferSpiel.filter(f=>f.bestellt).length;
+  const nichtBestellt=data.fuenferSpiel.filter(f=>!f.bestellt).length;
   const personOptsSel=(cur)=>data.personen.map(p=>`<option ${cur===p?'selected':''}>${esc(p)}</option>`).join("");
   const rows = ges===0 ? `<div class="empty">Noch keine 5er-Shots.</div>`
     : data.fuenferSpiel.map((f,i)=>`
@@ -611,8 +611,8 @@ function vFuenfer(){
   return `
     <div class="stats">
       <div class="stat"><span class="v">${ges}</span><div class="l">Gesamt</div></div>
-      <div class="stat"><span class="v amber">${offenZa}</span><div class="l">Zahler&nbsp;offen</div></div>
-      <div class="stat"><span class="v amber">${offenTr}</span><div class="l">Trinker&nbsp;offen</div></div>
+      <div class="stat"><span class="v green">${bestellt}</span><div class="l">Bestellt</div></div>
+      <div class="stat"><span class="v amber">${nichtBestellt}</span><div class="l">Noch&nbsp;nicht&nbsp;bestellt</div></div>
     </div>
     <button class="btn full" style="margin-bottom:14px" onclick="sheetFuenfer()">+ 5er verbuchen</button>
     ${rows}`;
@@ -1136,7 +1136,7 @@ function alkVergleich(g){
   return [
     `🍺 ${n1(koepi)} × 0,33 l Köpi`,
     `🥃 ${Math.round(tzShot)} Shots TrinkZwei (${n1(tzFlasche)} Flaschen)`,
-    `🍸 ${Math.round(vodka)} × Shots Vodka`,
+    `🍸 ${Math.round(vodka)} Shots Vodka`,
     `🔥 ~${Math.round(kcal)} kcal nur aus Alkohol`
   ];
 }
