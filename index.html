@@ -123,16 +123,15 @@
   .toggle button{flex:1; background:none; border:none; color:var(--dim); font-family:inherit; font-weight:700;
     padding:9px; border-radius:9px; font-size:.9rem}
   .toggle button.on{background:var(--amber); color:#1a1108}
-  /* Auswertung: vertikale Podest-artige Balken für alle Personen */
-  .rankchart{display:flex; align-items:flex-end; gap:14px; overflow-x:auto; padding:8px 4px 4px; margin-top:14px; scrollbar-width:none}
-  .rankchart::-webkit-scrollbar{display:none}
-  .rcol{flex:0 0 auto; width:58px; display:flex; flex-direction:column; align-items:center}
-  .rval{font-size:.78rem; font-weight:700; color:var(--dim); margin-bottom:6px; white-space:nowrap}
-  .rtrack{height:170px; display:flex; align-items:flex-end}
-  .rbar{width:34px; border-radius:9px 9px 3px 3px; transition:height .5s cubic-bezier(.25,.8,.3,1)}
-  .rmedal{font-size:1.1rem; margin-top:6px; line-height:1}
-  .rcol .ava{margin-top:4px}
-  .rname{font-size:.78rem; font-weight:600; margin-top:4px; text-align:center; max-width:58px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  /* Auswertung: horizontale Balken übereinander, alle Personen auf einen Blick */
+  .rankchart{display:flex; flex-direction:column; gap:10px; padding:4px 2px; margin-top:14px}
+  .rrow{display:flex; align-items:center; gap:8px}
+  .rperson{flex:0 0 auto; width:90px; display:flex; align-items:center; gap:6px; overflow:hidden}
+  .rperson .ava{flex:0 0 auto}
+  .rtrack{flex:1; height:16px; background:var(--bg3); border-radius:999px; overflow:hidden}
+  .rbar{height:100%; border-radius:999px; min-width:4px; transition:width .5s cubic-bezier(.25,.8,.3,1)}
+  .rname{font-size:.78rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .rval{flex:0 0 auto; width:58px; text-align:right; font-size:.78rem; font-weight:700; color:var(--dim); white-space:nowrap}
   /* Trink-Timeline */
   .tl{display:flex; gap:6px; overflow-x:auto; padding:4px 0 2px; scrollbar-width:none}
   .tl::-webkit-scrollbar{display:none}
@@ -172,6 +171,7 @@
   .cfbtns .btn{flex:1}
   .sheet{width:100%; background:var(--bg); border-top-left-radius:22px; border-top-right-radius:22px;
     border-top:1px solid var(--line); max-height:88dvh; overflow-y:auto; padding:8px 18px calc(20px + env(safe-area-inset-bottom))}
+  .sheet.full{max-height:100dvh; height:100dvh; padding-top:calc(env(safe-area-inset-top) + 8px)}
   .sheet .bar{width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 6px}
   .sheet .sh-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px}
   .sheet .sh-head .t{font-weight:700; font-size:1.15rem}
@@ -655,9 +655,27 @@ function vKasse(){
     let tot=0, lines="";
     Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
       lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
-    html+=`<h2>Kasse</h2><div class="scard kasse"><div class="sh"><span>🍻 Kasse</span><span class="e">${fmt(r2(tot))}</span></div>${lines}</div>`;
+    html+=`<h2>Kasse</h2><div class="scard kasse" onclick="sheetKasse()"><div class="sh"><span>🍻 Kasse</span><span class="e">${fmt(r2(tot))}</span></div>${lines}<div class="sline" style="color:var(--green)">Details ›</div></div>`;
   }
   return html;
+}
+/* Kasse-Detail: was auf die Kasse geht, gruppiert nach Getränk und aufklappbar nach Spiel */
+function sheetKasse(){
+  const m=effPayers();
+  const kasseItems=data.eintraege.filter(e=>m[e.id]==="KASSE");
+  const tot=r2(kasseItems.reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
+  const c={}; kasseItems.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
+  let lines="";
+  Object.keys(c).sort().forEach(g=>{ lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(r2(c[g]*preisOf(g)))}</span></div>`; });
+  if(!kasseItems.length) lines=`<div class="sline">nichts auf der Kasse</div>`;
+  const detail=kasseItems.length?`<div class="pdhead">Nach Spiel</div>${gameGroups(kasseItems,true,false)}`:"";
+  openSheet(head("🍻 Kasse")+`
+    <div class="scard paytoggle" onclick="this.classList.toggle('open')">
+      <div class="sh"><span>Summe ${kasseItems.length?'<span class="caret">▸</span>':''}</span><span class="e" style="color:var(--green)">${fmt(tot)}</span></div>
+      ${lines}
+      <div class="paydetail">${detail}</div>
+    </div>
+    ${kasseItems.length?'<p class="hint" style="margin-top:2px">Auf „Summe" tippen für die Aufschlüsselung nach Spiel.</p>':''}`);
 }
 
 /* Personen-Detail: was getrunken (nach Spiel) + was zu zahlen */
@@ -720,7 +738,7 @@ function sheetRanking(mode){
   const isAlk=rankMode==="alk", isPay=rankMode==="pay";
   const startBtn=`<button class="btn full" style="margin-bottom:16px;background:linear-gradient(90deg,#e6b24a,#d98a44);color:#1a1108" onclick="closeSheet();openReveal()">🏆 Auflösung starten</button>`;
   if(isAlk && !hatAlkDaten()){
-    openSheet(head("Auswertung")+startBtn+rankToggle()+`<p class="hint" style="margin-top:14px">Für die Alkohol-Auswertung trag bitte im Setup bei den Getränken <b>%vol</b> und <b>ml</b> ein.</p>`);
+    openSheet(head("Auswertung")+startBtn+rankToggle()+`<p class="hint" style="margin-top:14px">Für die Alkohol-Auswertung trag bitte im Setup bei den Getränken <b>%vol</b> und <b>ml</b> ein.</p>`, true);
     return;
   }
   const valFn=isPay?payFor:(isAlk?alkFor:anzFor);
@@ -730,22 +748,20 @@ function sheetRanking(mode){
   const baseColor=isPay?"#68b684":(isAlk?"#e07a5f":"#e6b24a");
   const pedColors=["#e6b24a","#c9d1d0","#cd7f4d"];
   const medals=["🥇","🥈","🥉"];
-  const maxH=170, minH=10;
+  const maxH=100, minH=6; // Breite in % der Balken-Spur
   const cols=rows.map((r,i)=>{
-    const h=r.v>0?Math.round(minH+(maxH-minH)*(r.v/max)):minH;
+    const w=r.v>0?Math.round(minH+(maxH-minH)*(r.v/max)):minH;
     const color=i<3?pedColors[i]:baseColor;
-    const glow=i===0?`box-shadow:0 0 18px ${color}99;`:"";
-    return `<div class="rcol">
+    const glow=i===0?`box-shadow:0 0 14px ${color}99;`:"";
+    return `<div class="rrow">
+      <div class="rperson">${avatarHtml(r.p,'sm')}<span class="rname">${i<3?medals[i]+' ':''}${esc(r.p)}${isGast(r.p)?' <span class="gastbadge">G</span>':''}</span></div>
+      <div class="rtrack"><div class="rbar" style="width:${w}%;background:${color};${glow}"></div></div>
       <div class="rval">${fmtV(r.v)}</div>
-      <div class="rtrack"><div class="rbar" style="height:${h}px;background:${color};${glow}"></div></div>
-      <div class="rmedal">${i<3?medals[i]:'&nbsp;'}</div>
-      ${avatarHtml(r.p,'sm')}
-      <div class="rname">${esc(r.p)}${isGast(r.p)?' <span class="gastbadge">G</span>':''}</div>
     </div>`;
   }).join("");
   const note=isAlk?`<p class="hint" style="margin-top:12px">Reiner Alkohol in Gramm (nur zugeordnete Trinker).</p>`
     :(isPay?`<p class="hint" style="margin-top:12px">Tatsächlich zu zahlender Betrag pro Person (inkl. ausgegebener Runden, ohne Kasse-Anteil).</p>`:``);
-  openSheet(head("Auswertung")+startBtn+rankToggle()+`<div class="rankchart">${cols}</div>`+note);
+  openSheet(head("Auswertung")+startBtn+rankToggle()+`<div class="rankchart">${cols}</div>`+note, true);
 }
 function rankToggle(){
   const b=(k,l)=>`<button class="${rankMode===k?'on':''}" onclick="sheetRanking('${k}')">${l}</button>`;
@@ -861,7 +877,7 @@ function restoreBackup(key){
 function opts(list){ return list.map(x=>`<option>${esc(x)}</option>`).join(""); }
 function personOpts(){ return opts(data.personen); }
 function getraenkOpts(){ return opts(data.getraenke.map(g=>g.name)); }
-function openSheet(html){ document.getElementById("sheet").innerHTML=`<div class="bar"></div>`+html; document.getElementById("overlay").classList.add("on"); }
+function openSheet(html, full){ const s=document.getElementById("sheet"); s.innerHTML=`<div class="bar"></div>`+html; s.classList.toggle("full", !!full); document.getElementById("overlay").classList.add("on"); }
 function closeSheet(){ document.getElementById("overlay").classList.remove("on"); }
 function head(title){ return `<div class="sh-head"><span class="t">${title}</span><button onclick="closeSheet()">Fertig</button></div>`; }
 function val(id){ return document.getElementById(id).value; }
