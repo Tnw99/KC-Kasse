@@ -321,9 +321,24 @@ let data=load();
 let view="aktionen";
 let undoStack=[]; // [{entryIds:[], fuenferId?}]
 
+/* Ergänzt fehlende Gast-Regeln in älteren Speicherständen (Standard: alles wie bei Mitgliedern) */
+function migrGast(o){
+  if(!o.gastRegeln || typeof o.gastRegeln!=="object") o.gastRegeln={};
+  const g=o.gastRegeln;
+  if(typeof g.eigene!=="boolean") g.eigene=false;
+  if(g.freibier==null || isNaN(parseInt(g.freibier))) g.freibier=(o.bierKasse!=null?o.bierKasse:3);
+  if(!Array.isArray(g.frei)) g.frei=[];
+  // Anwesenheit: fehlt sie, gelten alle als anwesend (Verhalten wie bisher)
+  if(!Array.isArray(o.anwesend)) o.anwesend=(o.personen||[]).slice();
+  else o.anwesend=o.anwesend.filter(n=>(o.personen||[]).includes(n));
+  if(typeof o.ohnePreise!=="boolean") o.ohnePreise=false;
+  return o;
+}
 function seed(){
   return {
     personen:["Jerry","Luiz","Mats","Flo"], gaeste:[], avatars:{}, bierKasse:3,
+    gastRegeln:{ eigene:false, freibier:3, frei:[] },
+    anwesend:["Jerry","Luiz","Mats","Flo"], ohnePreise:false,
     getraenke:[
       {name:"Jägermeister",preis:2.00,vol:35,ml:20},{name:"Klopfer",preis:1.50,vol:15,ml:20},{name:"Tequila",preis:2.50,vol:38,ml:20},
       {name:"Vodka",preis:2.00,vol:40,ml:20},{name:"Obstler",preis:1.80,vol:40,ml:20},{name:"Ouzo",preis:2.20,vol:37,ml:20},
@@ -337,7 +352,7 @@ function load(){
   try{
     const s=JSON.parse(localStorage.getItem(KEY));
     if(s&&s.personen&&s.getraenke){
-      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3;
+      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3; migrGast(s);
       s.eintraege.forEach(e=>{if(!e.id)e.id=uid();});
       s.fuenferSpiel.forEach(f=>{if(!f.id)f.id=uid();});
       return s;
@@ -431,7 +446,7 @@ async function initStorage(){
       try{
         const s=JSON.parse(cur);
         if(s&&s.personen&&s.getraenke){
-          s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3;
+          s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3; migrGast(s);
           data=s; save(); render(); toast("Daten aus Sicherung wiederhergestellt");
         }
       }catch(e){}
@@ -443,17 +458,42 @@ async function initStorage(){
 function drinkOf(name){ return data.getraenke.find(g=>g.name===name)||null; }
 function preisOf(name){ const g=drinkOf(name); return g?g.preis:0; }
 function isGast(name){ return data.gaeste.includes(name); }
+/* Anwesenheit: nur wer da ist, bekommt bei Runden ein Getränk verbucht.
+   Später Dazugekommene sammeln ihre Freibiere ganz normal ab dem Zeitpunkt, ab dem sie mittrinken. */
+function istDa(name){ return !Array.isArray(data.anwesend) || data.anwesend.includes(name); }
+function aktivePersonen(){ return data.personen.filter(istDa); }
+function toggleDa(i){
+  const name=data.personen[i]; if(!Array.isArray(data.anwesend)) data.anwesend=data.personen.slice();
+  if(istDa(name)) data.anwesend=data.anwesend.filter(n=>n!==name); else data.anwesend.push(name);
+  save(); render();
+}
+/* Preisloser Modus: es zählen nur noch Anzahlen. Geldbeträge werden überall ausgeblendet. */
+function ohnePreise(){ return !!data.ohnePreise; }
+/* Zeigt einen Geldbetrag - oder im preislosen Modus stattdessen den Ersatztext (meist eine Anzahl) */
+function fmtP(v, alt){ return ohnePreise() ? (alt==null?"":alt) : fmt(v); }
+function anzahlVon(items){ return items.reduce((s,e)=>s+(e.anzahl||1),0); }
 /* reiner Alkohol in Gramm pro Getränk (ml * vol% * 0.789) */
 function alkOf(name){ const g=drinkOf(name); if(!g||!g.vol||!g.ml) return 0; return g.ml*(g.vol/100)*0.789; }
 function alkFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl*alkOf(e.getraenk),0); }
 function anzFor(name){ return data.eintraege.filter(e=>e.trinkt===name).reduce((s,e)=>s+e.anzahl,0); }
-/* Effektiver Zahler je Eintrag: Bier aus Bier-Runden geht bis zur aktuell eingestellten
-   Freibier-Zahl (bierKasse) auf die KASSE, darüber auf die Person selbst. Wird live berechnet,
-   damit ein Ändern der Einstellung rückwirkend gilt. Alle anderen Einträge behalten ihren Zahler. */
+/* Effektiver Zahler je Eintrag: Bier aus Bier-Runden geht bis zur eingestellten Freibier-Zahl
+   auf die KASSE, darüber auf die Person selbst. Wird live berechnet, damit ein Ändern der
+   Einstellung rückwirkend gilt. Für Gäste gelten bei aktivierten Gast-Regeln eine eigene
+   Freibier-Zahl und eine Liste von Getränken, die sie generell nicht zahlen. */
+function freibierFor(name){
+  const g=data.gastRegeln;
+  if(g && g.eigene && isGast(name)) return parseInt(g.freibier)||0;
+  return data.bierKasse;
+}
+function gastFrei(name, getraenk){
+  const g=data.gastRegeln;
+  return !!(g && g.eigene && isGast(name) && Array.isArray(g.frei) && g.frei.includes(getraenk));
+}
 function effPayers(){
   const map={};
   data.eintraege.forEach(e=>{ map[e.id]=e.bezahlt; });
   data.personen.forEach(P=>{
+    const limit=freibierFor(P);
     const biers=data.eintraege
       .filter(e=>e.trinkt===P && e.getraenk && e.getraenk.toLowerCase()==="bier")
       .sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
@@ -461,9 +501,16 @@ function effPayers(){
     biers.forEach(e=>{
       n+=e.anzahl||1;
       if(e.spielinfo && e.spielinfo.startsWith("Bier-Runde")){
-        map[e.id]= n<=data.bierKasse ? "KASSE" : P;
+        map[e.id]= n<=limit ? "KASSE" : P;
       }
     });
+  });
+  // Frei-Getränke für Gäste: greift nur, wenn der Gast sonst selbst zahlen müsste.
+  // Gibt jemand anderes eine Runde aus, bleibt dieser Zahler bestehen.
+  data.eintraege.forEach(e=>{
+    if(map[e.id] && map[e.id]!=="KASSE" && isGast(map[e.id]) && gastFrei(map[e.id], e.getraenk)){
+      map[e.id]="KASSE";
+    }
   });
   return map;
 }
@@ -495,12 +542,13 @@ function undo(){
   save(); render(); toast("Rückgängig");
 }
 
-/* ---------- Aktionen (Regeln 1:1 aus alter Version) ---------- */
+/* ---------- Aktionen (Regeln 1:1 aus alter Version, aber nur für Anwesende) ---------- */
 function doShotRunde(shot, starter){
-  pushEntries(data.personen.map(p=>({
+  const wer=aktivePersonen();
+  pushEntries(wer.map(p=>({
     getraenk:shot, trinkt:p, bezahlt:p===starter?"KASSE":p, anzahl:1, spielinfo:`Alle 9 (${starter})`
   })));
-  toast("Shot-Runde erstellt");
+  toast(`Shot-Runde für ${wer.length} erstellt`);
 }
 function doBierRunde(){
   let maxNr=0;
@@ -508,14 +556,16 @@ function doBierRunde(){
   const nr=maxNr+1;
   const cnt={}; data.personen.forEach(p=>cnt[p]=0);
   data.eintraege.forEach(e=>{ if(e.getraenk.toLowerCase()==="bier"&&cnt[e.trinkt]!==undefined) cnt[e.trinkt]+=e.anzahl; });
-  pushEntries(data.personen.map(p=>{
+  const wer=aktivePersonen();
+  pushEntries(wer.map(p=>{
     const n=cnt[p]+1;
-    return {getraenk:"Bier", trinkt:p, bezahlt:n<=data.bierKasse?"KASSE":p, anzahl:1, spielinfo:`Bier-Runde ${nr}`};
+    return {getraenk:"Bier", trinkt:p, bezahlt:n<=freibierFor(p)?"KASSE":p, anzahl:1, spielinfo:`Bier-Runde ${nr}`};
   }));
-  toast(`Bier-Runde ${nr} erstellt`);
+  toast(`Bier-Runde ${nr} für ${wer.length} erstellt`);
 }
 function doRunde(geber, getraenk){
-  pushEntries(data.personen.map(p=>({
+  const wer=aktivePersonen();
+  pushEntries(wer.map(p=>({
     getraenk, trinkt:p, bezahlt:geber, anzahl:1, spielinfo:`Runde von ${geber}`
   })));
   toast(`${geber} gibt eine Runde`);
@@ -565,7 +615,7 @@ function tally(n){
 
 /* ---------- Render ---------- */
 function render(){
-  document.getElementById("headsum").textContent=fmt(grand());
+  document.getElementById("headsum").textContent=ohnePreise()?`${anzahlVon(data.eintraege)}×`:fmt(grand());
   document.getElementById("undoBtn").disabled=undoStack.length===0;
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.v===view));
   const m=document.getElementById("main");
@@ -574,7 +624,14 @@ function render(){
 
 function vAktionen(){
   if(!data.personen.length) return `<div class="empty">Erst Personen im Setup-Tab anlegen.</div>`;
+  const da=aktivePersonen().length;
+  const chips=data.personen.map((p,i)=>
+    `<button class="gasttog ${istDa(p)?'on':''}" style="margin:0 6px 6px 0" onclick="toggleDa(${i})">${istDa(p)?'✓ ':''}${esc(p)}</button>`
+  ).join("");
   return `
+    <h2>Wer ist da?</h2>
+    <div style="margin-bottom:4px">${chips}</div>
+    <p class="hint" style="margin-bottom:16px">${da} von ${data.personen.length} da. Runden gelten nur für Angehakte. Wer später kommt, einfach dann anhaken – die Freibiere sammelt jede/r unabhängig ab dem ersten eigenen Bier.</p>
     <div class="grid">
       <button class="abtn" onclick="sheetShot()"><span class="ic">🥃</span>Shot-Runde</button>
       <button class="abtn" onclick="sheetBier()"><span class="ic">🍺</span>Bier-Runde</button>
@@ -633,21 +690,22 @@ function renderKasseLines(items){
   const c={}; normal.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
   let tot=0, lines="";
   Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
-    lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
+    lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmtP(sub)}</span></div>`; });
   offen.forEach(e=>{
     const sub=r2(e.anzahl*preisOf(e.getraenk)); tot+=sub;
-    lines+=`<div class="sline" style="opacity:.5"><span>🎲 ${esc(e.getraenk)} (nicht bestellt)</span><span>${fmt(sub)}</span></div>`;
+    lines+=`<div class="sline" style="opacity:.5"><span>🎲 ${esc(e.getraenk)} (nicht bestellt)</span><span>${fmtP(sub)}</span></div>`;
   });
   return {tot:r2(tot), lines};
 }
 function vKasse(){
   if(!data.eintraege.length) return `<div class="empty">Noch nichts getrunken.</div>`;
-  let html=`<button class="btn full" style="margin-bottom:16px;background:linear-gradient(90deg,#e6b24a,#d98a44);color:#1a1108" onclick="sheetRanking('anz')">📊 Auswertung</button>`;
+  let html=`<button class="btn full" style="margin-bottom:8px;background:linear-gradient(90deg,#e6b24a,#d98a44);color:#1a1108" onclick="sheetRanking('anz')">📊 Auswertung</button>`;
+  html+=`<button class="btn full ghost" style="margin-bottom:16px" onclick="sheetWhatsApp()">💬 WhatsApp-Zusammenfassung</button>`;
 
   const gAnz=data.eintraege.reduce((a,e)=>a+e.anzahl,0);
   const offenZa=data.fuenferSpiel.filter(f=>!f.bezahlt).length;
   const bierR=bierRundenCount();
-  html+=`<div class="grand"><div><b>Zu zahlen gesamt</b></div><span class="v">${fmt(grand())}</span></div>`;
+  html+=`<div class="grand"><div><b>${ohnePreise()?"Getränke gesamt":"Zu zahlen gesamt"}</b></div><span class="v">${ohnePreise()?anzahlVon(data.eintraege)+"×":fmt(grand())}</span></div>`;
   html+=`<p class="hint" style="margin:-6px 0 12px">${gAnz} Getränke · 🍺 ${bierR} Bier-Runde${bierR===1?'':'n'}${offenZa?` · ${offenZa} 5er noch ohne Zahler`:""} · Kasse-Anteil unten aufgeschlüsselt</p>`;
 
   html+=`<h2>Pro Person (Zahler)</h2>`;
@@ -657,7 +715,7 @@ function vKasse(){
     const badge=isGast(p)?' <span class="gastbadge">Gast</span>':'';
     if(!items.length){ html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">0,00 €</span></div><div class="sline">nichts zu zahlen · Details ›</div></div>`; return; }
     const {tot,lines}=renderKasseLines(items);
-    html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">${fmt(tot)}</span></div>${lines}<div class="sline" style="color:var(--amber)">Details ›</div></div>`;
+    html+=`<div class="scard" onclick="sheetPerson('${p.replace(/'/g,"\\'")}')"><div class="sh"><span>${esc(p)}${badge}</span><span class="e">${ohnePreise()?anzahlVon(items)+"×":fmt(tot)}</span></div>${lines}<div class="sline" style="color:var(--amber)">Details ›</div></div>`;
   });
 
   const offen=data.eintraege.filter(e=>!m[e.id]);
@@ -665,18 +723,89 @@ function vKasse(){
     const c={}; offen.forEach(e=>c[e.getraenk]=(c[e.getraenk]||0)+e.anzahl);
     let tot=0, lines="";
     Object.keys(c).sort().forEach(g=>{ const sub=r2(c[g]*preisOf(g)); tot+=sub;
-      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmt(sub)}</span></div>`; });
-    html+=`<h2>Noch offen (kein Zahler)</h2><div class="scard pending"><div class="sh"><span>❓ Offen</span><span class="e">${fmt(r2(tot))}</span></div>${lines}</div>`;
+      lines+=`<div class="sline"><span>${esc(g)} · ${c[g]}×</span><span>${fmtP(sub)}</span></div>`; });
+    html+=`<h2>Noch offen (kein Zahler)</h2><div class="scard pending"><div class="sh"><span>❓ Offen</span><span class="e">${ohnePreise()?anzahlVon(offen)+"×":fmt(r2(tot))}</span></div>${lines}</div>`;
   }
 
   const kasse=data.eintraege.filter(e=>m[e.id]==="KASSE");
   if(kasse.length){
     const {tot,lines}=renderKasseLines(kasse);
-    html+=`<h2>Kasse</h2><div class="scard kasse" onclick="sheetKasse()"><div class="sh"><span>🍻 Kasse</span><span class="e">${fmt(tot)}</span></div>${lines}<div class="sline" style="color:var(--green)">Details ›</div></div>`;
+    html+=`<h2>Kasse</h2><div class="scard kasse" onclick="sheetKasse()"><div class="sh"><span>🍻 Kasse</span><span class="e">${ohnePreise()?anzahlVon(kasse)+"×":fmt(tot)}</span></div>${lines}<div class="sline" style="color:var(--green)">Details ›</div></div>`;
   }
   return html;
 }
 /* Kasse-Detail: was auf die Kasse geht, gruppiert nach Getränk und aufklappbar nach Spiel */
+/* ---------- WhatsApp-Zusammenfassung ---------- */
+/* Baut den Nachrichtentext: pro Person die getrunkenen Getränke, absteigend nach Anzahl. */
+function whatsAppText(){
+  const m=effPayers();
+  /* Zählt Getränke einer Eintragsliste und gibt sie als "N x Getränk"-Zeilen zurück,
+     die häufigsten zuerst. */
+  const liste=(items)=>{
+    const c={}; items.forEach(e=>{ c[e.getraenk]=(c[e.getraenk]||0)+(e.anzahl||1); });
+    return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b,"de"))
+      .map(g=>`${c[g]} x ${g}`).join("\n");
+  };
+  const bloecke=[];
+  data.personen.forEach(p=>{
+    const items=data.eintraege.filter(e=>e.trinkt===p);
+    if(!items.length) return;
+    let kopf=p+(isGast(p)?" (Gast)":"")+":";
+    if(!ohnePreise()){
+      const summe=r2(data.eintraege.filter(e=>m[e.id]===p).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
+      if(summe>0) kopf=`${p}${isGast(p)?" (Gast)":""}: ${fmt(summe)}`;
+    }
+    bloecke.push(kopf+"\n"+liste(items));
+  });
+  // Nicht zugeordnete 5er-Shots separat ausweisen, damit nichts unter den Tisch fällt
+  const offen=data.eintraege.filter(e=>!e.trinkt);
+  if(offen.length) bloecke.push("Noch keinem zugeordnet:\n"+liste(offen));
+  // Kasse zum Schluss mit eigener Getränkeliste
+  const kasseItems=data.eintraege.filter(e=>m[e.id]==="KASSE");
+  if(kasseItems.length){
+    const summe=r2(kasseItems.reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
+    bloecke.push((ohnePreise()?"Kasse:":`Kasse: ${fmt(summe)}`)+"\n"+liste(kasseItems));
+  }
+  const kopfzeile="Zu zahlen vom Kegelabend:";
+  if(!bloecke.length) return kopfzeile+"\n\nEssen nicht vergessen\n\nHeute wurde nichts verbucht.";
+  return kopfzeile+"\n\nEssen nicht vergessen\n\n"+bloecke.join("\n\n");
+}
+
+function sheetWhatsApp(){
+  const txt=whatsAppText();
+  openSheet(head("💬 Zusammenfassung")+`
+    <textarea id="waText" style="width:100%; min-height:300px; background:var(--bg2); color:var(--chalk);
+      border:1px solid var(--line); border-radius:12px; padding:12px; font-family:inherit; font-size:.92rem;
+      line-height:1.5; resize:vertical">${esc(txt)}</textarea>
+    <div class="stack" style="margin-top:12px">
+      <button class="btn full" onclick="waCopy()">📋 Text kopieren</button>
+      <button class="btn full ghost" onclick="waShare()">📤 Teilen / in WhatsApp öffnen</button>
+    </div>
+    <p class="hint">Text lässt sich vorher direkt hier bearbeiten. „Teilen" öffnet die App-Auswahl deines Handys.</p>`, true);
+}
+function waVal(){ const t=document.getElementById("waText"); return t?t.value:whatsAppText(); }
+function waCopy(){
+  const txt=waVal();
+  const ok=()=>toast("Text kopiert");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(ok).catch(()=>waCopyFallback(txt));
+  } else waCopyFallback(txt);
+}
+function waCopyFallback(txt){
+  // Ältere iOS-Safari-Versionen brauchen den Umweg über eine Auswahl
+  const t=document.getElementById("waText");
+  if(t){ t.focus(); t.setSelectionRange(0,t.value.length); }
+  try{ document.execCommand("copy"); toast("Text kopiert"); }
+  catch(e){ toast("Bitte manuell markieren & kopieren"); }
+}
+function waShare(){
+  const txt=waVal();
+  if(navigator.share){
+    navigator.share({text:txt}).catch(()=>{});
+  } else {
+    window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank");
+  }
+}
 function sheetKasse(){
   const m=effPayers();
   const kasseItems=data.eintraege.filter(e=>m[e.id]==="KASSE");
@@ -685,7 +814,7 @@ function sheetKasse(){
   const detail=kasseItems.length?`<div class="pdhead">Nach Spiel</div>${gameGroups(kasseItems,true,false)}`:"";
   openSheet(head("🍻 Kasse")+`
     <div class="scard paytoggle" onclick="this.classList.toggle('open')">
-      <div class="sh"><span>Summe ${kasseItems.length?'<span class="caret">▸</span>':''}</span><span class="e" style="color:var(--green)">${fmt(tot)}</span></div>
+      <div class="sh"><span>Summe ${kasseItems.length?'<span class="caret">▸</span>':''}</span><span class="e" style="color:var(--green)">${ohnePreise()?anzahlVon(kasseItems)+"×":fmt(tot)}</span></div>
       ${lines}
       <div class="paydetail">${detail}</div>
     </div>
@@ -702,7 +831,7 @@ function gameGroups(list, showPrice, wrap){
   return order.map(game=>{
     const rows=byGame[game].map(e=>{
       const t=uhr(e.timestamp), label=`${e.anzahl>1?e.anzahl+"× ":""}${esc(e.getraenk)}`;
-      if(showPrice) return `<div class="sline"><span>${label}${t?' · '+t:''}</span><span>${fmt(r2(e.anzahl*preisOf(e.getraenk)))}</span></div>`;
+      if(showPrice) return `<div class="sline"><span>${label}${t?' · '+t:''}</span><span>${fmtP(r2(e.anzahl*preisOf(e.getraenk)))}</span></div>`;
       return `<div class="sline"><span>${label}</span><span>${t}</span></div>`;
     }).join("");
     if(wrap) return `<div class="scard"><div class="sh" style="font-size:.9rem">${esc(game)}</div>${rows}</div>`;
@@ -731,7 +860,7 @@ function sheetPerson(name){
   openSheet(head(esc(name)+(isGast(name)?' <span class="gastbadge">Gast</span>':''))+`
     <h2 style="margin-top:0">Muss zahlen</h2>
     <div class="scard paytoggle" onclick="this.classList.toggle('open')">
-      <div class="sh"><span>Summe ${payItems.length?'<span class="caret">▸</span>':''}</span><span class="e">${fmt(payTot)}</span></div>
+      <div class="sh"><span>Summe ${payItems.length?'<span class="caret">▸</span>':''}</span><span class="e">${ohnePreise()?anzahlVon(payItems)+"×":fmt(payTot)}</span></div>
       ${payLines}
       <div class="paydetail">${payDetail}</div>
     </div>
@@ -776,7 +905,7 @@ function sheetRanking(mode){
 }
 function rankToggle(){
   const b=(k,l)=>`<button class="${rankMode===k?'on':''}" onclick="sheetRanking('${k}')">${l}</button>`;
-  return `<div class="toggle">${b('anz','Getränke')}${b('alk','Alkohol')}${b('pay','Bezahlt')}</div>`;
+  return `<div class="toggle">${b('anz','Getränke')}${b('alk','Alkohol')}${ohnePreise()?'':b('pay','Bezahlt')}</div>`;
 }
 
 function vLog(){
@@ -788,7 +917,7 @@ function vLog(){
         <div class="tt">${e.anzahl>1?e.anzahl+"× ":""}${esc(e.getraenk)}${uhr(e.timestamp)?` <span style="color:var(--dim);font-weight:500;font-size:.82rem">${uhr(e.timestamp)}</span>`:""}</div>
         <div class="sub">trinkt ${e.trinkt?esc(e.trinkt):"—"} · zahlt ${m[e.id]?esc(m[e.id]):"—"}${e.spielinfo?" · "+esc(e.spielinfo):""}</div>
       </div>
-      <span class="price">${m[e.id]==="KASSE"?"Kasse":fmt(r2(e.anzahl*preisOf(e.getraenk)))}</span>
+      <span class="price">${m[e.id]==="KASSE"?"Kasse":fmtP(r2(e.anzahl*preisOf(e.getraenk)), e.anzahl+"×")}</span>
       <button class="del" onclick="delEintrag('${e.id}')">×</button>
     </div>`).join("");
 }
@@ -800,7 +929,7 @@ function vSetup(){
       <button class="gasttog ${isGast(p)?'on':''}" onclick="toggleGast(${i})">Gast</button>
       <button class="del" onclick="delPerson(${i})">×</button></div>`).join("")||`<p class="hint">Keine Personen.</p>`;
   const drinks=data.getraenke.map((g,i)=>{
-    const meta=[fmt(g.preis), (g.vol?g.vol+"%vol":""), (g.ml?g.ml+" ml":"")].filter(Boolean).join(" · ");
+    const meta=[ohnePreise()?"":fmt(g.preis), (g.vol?g.vol+"%vol":""), (g.ml?g.ml+" ml":"")].filter(Boolean).join(" · ");
     return `<div class="item" onclick="sheetDrink(${i})">
       <div class="grow"><div class="name">${esc(g.name)}</div><div class="dmeta">${meta}</div></div>
       <span class="editarrow">›</span></div>`;
@@ -813,12 +942,19 @@ function vSetup(){
     <button class="btn full" style="margin-top:6px" onclick="sheetDrink(-1)">+ Getränk hinzufügen</button>
     <p class="hint">Getränk antippen zum Bearbeiten. %vol und ml sind optional – nur nötig für die Alkohol-Rangliste.</p>
     <h2>Regeln</h2>
+    <div class="toggle" style="margin-bottom:10px">
+      <button class="${!ohnePreise()?'on':''}" onclick="setOhnePreise(false)">Mit Preisen</button>
+      <button class="${ohnePreise()?'on':''}" onclick="setOhnePreise(true)">Nur Anzahlen</button>
+    </div>
+    <p class="hint" style="margin-bottom:14px">„Nur Anzahlen" blendet alle Geldbeträge aus – gezählt wird dann nur noch, wer wie viel getrunken hat. Die Preise bleiben gespeichert und kommen beim Zurückschalten wieder.</p>
     <div class="item">
       <span class="name">Freibier je Person (Kasse)</span>
       <input class="price" type="number" inputmode="numeric" min="0" step="1" value="${data.bierKasse}" onchange="setBierKasse(this.value)">
       <span class="unit">Bier</span>
     </div>
     <p class="hint">Bei einer Bier-Runde zahlt die Kasse pro Person so viele Bier, ab dann zahlt jede/r selbst. Standard: 3.</p>
+    <h2>Einstellungen für Gäste</h2>
+    ${gastSettings()}
     <h2>Daten</h2>
     <div class="stack">
       <button class="btn ghost" onclick="exportData()">Abend exportieren (JSON)</button>
@@ -877,7 +1013,7 @@ function restoreBackup(key){
     let s; try{ s=JSON.parse(json); if(!s.personen||!s.getraenke) throw 0; }catch(e){ toast("Sicherung nicht lesbar"); return; }
     const label=key==="pre-change"?"Stand vor letztem Zurücksetzen/Import":"Sicherung vom "+String(key).slice(7);
     askConfirm(`${label} laden? Der aktuelle Stand wird ersetzt.`, ()=>{
-      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3;
+      s.eintraege=s.eintraege||[]; s.fuenferSpiel=s.fuenferSpiel||[]; s.gaeste=s.gaeste||[]; s.avatars=s.avatars||{}; if(s.bierKasse==null) s.bierKasse=3; migrGast(s);
       s.eintraege.forEach(e=>{if(!e.id)e.id=uid();}); s.fuenferSpiel.forEach(x=>{if(!x.id)x.id=uid();});
       data=s; undoStack=[]; save(); render(); closeSheet(); toast("Sicherung geladen");
     }, "Laden");
@@ -887,6 +1023,7 @@ function restoreBackup(key){
 /* ---------- Sheets ---------- */
 function opts(list){ return list.map(x=>`<option>${esc(x)}</option>`).join(""); }
 function personOpts(){ return opts(data.personen); }
+function daOpts(){ const a=aktivePersonen(); return opts(a.length?a:data.personen); }
 function getraenkOpts(){ return opts(data.getraenke.map(g=>g.name)); }
 function openSheet(html, full){ const s=document.getElementById("sheet"); s.innerHTML=`<div class="bar"></div>`+html; s.classList.toggle("full", !!full); document.getElementById("overlay").classList.add("on"); }
 function closeSheet(){ document.getElementById("overlay").classList.remove("on"); }
@@ -894,16 +1031,18 @@ function head(title){ return `<div class="sh-head"><span class="t">${title}</spa
 function val(id){ return document.getElementById(id).value; }
 
 function sheetShot(){ openSheet(head("Shot-Runde")+`
+  <p class="hint" style="margin-bottom:14px">Gilt für die ${aktivePersonen().length} anwesenden Personen.</p>
   <div class="fg"><label>Shot</label><select id="s_shot">${getraenkOpts()}</select></div>
-  <div class="fg"><label>Starter (Alle 9 – zahlt nicht)</label><select id="s_starter">${personOpts()}</select></div>
+  <div class="fg"><label>Starter (Alle 9 – zahlt nicht)</label><select id="s_starter">${daOpts()}</select></div>
   <button class="btn full" onclick="doShotRunde(val('s_shot'),val('s_starter'));closeSheet()">Erstellen</button>`); }
 
 function sheetBier(){ openSheet(head("Bier-Runde")+`
-  <p class="hint" style="margin-bottom:14px">Jede Person bekommt +1 Bier. Die ersten ${data.bierKasse} Bier pro Person zahlt die Kasse, danach selbst.</p>
+  <p class="hint" style="margin-bottom:14px">Die ${aktivePersonen().length} anwesenden Personen bekommen +1 Bier. Die ersten ${data.bierKasse} Bier pro Person zahlt die Kasse, danach selbst.</p>
   <button class="btn full" onclick="doBierRunde();closeSheet()">Erstellen</button>`); }
 
 function sheetRunde(){ openSheet(head("Runde ausgeben")+`
-  <div class="fg"><label>Wer gibt aus?</label><select id="r_geber">${personOpts()}</select></div>
+  <p class="hint" style="margin-bottom:14px">Gilt für die ${aktivePersonen().length} anwesenden Personen.</p>
+  <div class="fg"><label>Wer gibt aus?</label><select id="r_geber">${daOpts()}</select></div>
   <div class="fg"><label>Getränk</label><select id="r_getr">${getraenkOpts()}</select></div>
   <button class="btn full" onclick="doRunde(val('r_geber'),val('r_getr'));closeSheet()">Erstellen</button>`); }
 
@@ -935,8 +1074,8 @@ function delFuenfer(id){
 function delEintrag(id){ askConfirm("Eintrag löschen?", ()=>{ data.eintraege=data.eintraege.filter(e=>e.id!==id); save(); render(); }); }
 
 /* ---------- Setup Aktionen ---------- */
-function addPerson(){ const v=(val("npName")||"").trim(); if(!v) return; if(data.personen.includes(v)){toast("Existiert bereits");return;} data.personen.push(v); save(); render(); }
-function delPerson(i){ const name=data.personen[i]; askConfirm(`${name} löschen?`, ()=>{ data.personen.splice(i,1); data.gaeste=data.gaeste.filter(g=>g!==name); delete data.avatars[name]; save(); render(); }); }
+function addPerson(){ const v=(val("npName")||"").trim(); if(!v) return; if(data.personen.includes(v)){toast("Existiert bereits");return;} data.personen.push(v); if(Array.isArray(data.anwesend)) data.anwesend.push(v); save(); render(); }
+function delPerson(i){ const name=data.personen[i]; askConfirm(`${name} löschen?`, ()=>{ data.personen.splice(i,1); data.gaeste=data.gaeste.filter(g=>g!==name); if(Array.isArray(data.anwesend)) data.anwesend=data.anwesend.filter(n=>n!==name); delete data.avatars[name]; save(); render(); }); }
 function uploadAvatar(i, input){
   const f=input.files[0]; if(!f) return; const name=data.personen[i];
   const rd=new FileReader();
@@ -951,8 +1090,44 @@ function uploadAvatar(i, input){
   rd.readAsDataURL(f); input.value="";
 }
 function toggleGast(i){ const name=data.personen[i]; if(isGast(name)) data.gaeste=data.gaeste.filter(g=>g!==name); else data.gaeste.push(name); save(); render(); }
+function setOhnePreise(v){ data.ohnePreise=!!v; save(); render(); toast(v?"Preise ausgeblendet":"Preise wieder aktiv"); }
 function setBierKasse(v){ const n=parseInt(v); if(isNaN(n)||n<0) return; data.bierKasse=n; save(); render(); toast(`Freibier: ${n} pro Person – Kasse aktualisiert`); }
-function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
+/* ---------- Gast-Regeln ---------- */
+function gastSettings(){
+  const g=data.gastRegeln, eig=!!g.eigene;
+  const anzGaeste=data.gaeste.length;
+  const toggle=`<div class="toggle" style="margin-bottom:10px">
+      <button class="${!eig?'on':''}" onclick="setGastModus(false)">Wie Mitglieder</button>
+      <button class="${eig?'on':''}" onclick="setGastModus(true)">Eigene Regeln</button>
+    </div>`;
+  if(!eig){
+    return toggle+`<p class="hint">Gäste werden aktuell genau wie feste Mitglieder abgerechnet${anzGaeste?` (${anzGaeste} als Gast markiert)`:""}.</p>`;
+  }
+  const frei=Array.isArray(g.frei)?g.frei:[];
+  const chips=data.getraenke.map(d=>
+    `<button class="gasttog ${frei.includes(d.name)?'on':''}" style="margin:0 6px 6px 0" onclick="toggleGastFrei('${d.name.replace(/'/g,"\\'")}')">${esc(d.name)}</button>`
+  ).join("");
+  return toggle+`
+    <div class="item">
+      <span class="name">Freibier je Gast (Kasse)</span>
+      <input class="price" type="number" inputmode="numeric" min="0" step="1" value="${g.freibier}" onchange="setGastFreibier(this.value)">
+      <span class="unit">Bier</span>
+    </div>
+    <p class="hint">Statt ${data.bierKasse} bei Mitgliedern. Auf 0 setzen, wenn Gäste gar kein Freibier bekommen sollen.</p>
+    <div style="margin-top:12px">
+      <div style="font-weight:700; margin-bottom:8px">Diese Getränke zahlen Gäste nie</div>
+      ${chips||'<p class="hint">Keine Getränke angelegt.</p>'}
+    </div>
+    <p class="hint">Ausgewählte Getränke gehen bei Gästen immer auf die Kasse – unbegrenzt. Gibt jemand anderes eine Runde aus, bleibt diese Person trotzdem der Zahler.</p>`;
+}
+function setGastModus(eigene){ data.gastRegeln.eigene=!!eigene; save(); render(); toast(eigene?"Eigene Gast-Regeln aktiv":"Gäste wie Mitglieder"); }
+function setGastFreibier(v){ const n=parseInt(v); if(isNaN(n)||n<0) return; data.gastRegeln.freibier=n; save(); render(); toast(`Freibier für Gäste: ${n}`); }
+function toggleGastFrei(name){
+  const g=data.gastRegeln; if(!Array.isArray(g.frei)) g.frei=[];
+  if(g.frei.includes(name)) g.frei=g.frei.filter(x=>x!==name); else g.frei.push(name);
+  save(); render(); toast(g.frei.includes(name)?`${name} für Gäste frei`:`${name} nicht mehr frei`);
+}
+function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; data.anwesend=data.personen.slice(); undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
 
 /* ---------- Export / Import ---------- */
 function exportData(){
@@ -971,7 +1146,7 @@ function importData(input){
     }catch(e){ toast("Datei konnte nicht gelesen werden"); input.value=""; return; }
     askConfirm("Import überschreibt den aktuellen Abend. Fortfahren?", ()=>{
       idbPut("pre-change",JSON.stringify(data));
-      imp.eintraege=imp.eintraege||[]; imp.fuenferSpiel=imp.fuenferSpiel||[]; imp.gaeste=imp.gaeste||[]; imp.avatars=imp.avatars||{}; if(imp.bierKasse==null) imp.bierKasse=3;
+      imp.eintraege=imp.eintraege||[]; imp.fuenferSpiel=imp.fuenferSpiel||[]; imp.gaeste=imp.gaeste||[]; imp.avatars=imp.avatars||{}; if(imp.bierKasse==null) imp.bierKasse=3; migrGast(imp);
       imp.eintraege.forEach(e=>{if(!e.id)e.id=uid();}); imp.fuenferSpiel.forEach(x=>{if(!x.id)x.id=uid();});
       data=imp; undoStack=[]; save(); render(); toast("Importiert");
     }, "Importieren");
@@ -1021,12 +1196,15 @@ function stage(){ return `<div class="beams"></div><div class="spot"></div>`; }
 function openReveal(){
   clearRevealTimers(); audio();
   const alkBtn=hatAlkDaten()?`<button class="revbig" onclick="startReveal('alk')">🥃<span>Meister Alkohol</span></button>`:"";
+  const payBtn=ohnePreise()
+    ? `<button class="revbig" onclick="startReveal('anz')">🍺<span>Meiste Getränke</span></button>`
+    : `<button class="revbig" onclick="startReveal('pay')">💶<span>Meiste Ausgaben</span></button>`;
   setRevealBody(`${stage()}
     <button class="revclose" onclick="closeReveal()">×</button>${muteBtn()}
     <div class="revtitle glow">🏆 DIE AUFLÖSUNG</div>
     <p class="rsub">Wer räumt heute ab? Kategorie wählen:</p>
     <div class="revchoices">
-      <button class="revbig" onclick="startReveal('pay')">💶<span>Meiste Ausgaben</span></button>
+      ${payBtn}
       ${alkBtn}
     </div>`);
   document.getElementById("revealOverlay").classList.add("on");
@@ -1034,9 +1212,10 @@ function openReveal(){
 
 function startReveal(mode){
   clearRevealTimers(); audio();
-  const isPay=mode==="pay";
-  const rank=data.personen.map(p=>({p,v:isPay?payFor(p):alkFor(p)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,3);
-  const title=isPay?"💶 Meiste Ausgaben":"🥃 Meister Alkohol";
+  const isPay=mode==="pay", isAnz=mode==="anz";
+  const valFn=isPay?payFor:(isAnz?anzFor:alkFor);
+  const rank=data.personen.map(p=>({p,v:valFn(p)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,3);
+  const title=isPay?"💶 Meiste Ausgaben":(isAnz?"🍺 Meiste Getränke":"🥃 Meister Alkohol");
   if(!rank.length){
     setRevealBody(`${stage()}<button class="revclose" onclick="closeReveal()">×</button>
       <div class="revtitle">${title}</div><p class="rsub">Dafür gibt es noch keine Daten.</p>
@@ -1052,11 +1231,12 @@ function startReveal(mode){
   tmr(()=>{ if(cd()){cd().textContent="2"; cd().classList.remove("bump"); void cd().offsetWidth; cd().classList.add("bump");} cdBeep(false); },900);
   tmr(()=>{ if(cd()){cd().textContent="1"; cd().classList.remove("bump"); void cd().offsetWidth; cd().classList.add("bump");} cdBeep(false); },1800);
   tmr(()=>{ if(cd()){cd().textContent="LOS!"; cd().classList.add("bump");} cdBeep(true); },2700);
-  tmr(()=>runPodium(isPay, rank, title),3400);
+  tmr(()=>runPodium(mode, rank, title),3400);
 }
 
-function runPodium(isPay, rank, title){
-  const fmtV=v=>isPay?fmt(r2(v)):`${v.toFixed(0)} g`;
+function runPodium(mode, rank, title){
+  const isPay=mode==="pay", isAnz=mode==="anz";
+  const fmtV=v=>isPay?fmt(r2(v)):(isAnz?`${v}×`:`${v.toFixed(0)} g`);
   const pedColors=["#e6b24a","#c9d1d0","#cd7f4d"], medals=["🥇","🥈","🥉"], order=[1,0,2];
   const maxV=rank[0].v||1, maxH=185, minH=48;
   const heightFor=idx=>Math.round(minH+(maxH-minH)*(rank[idx].v/maxV));
@@ -1069,7 +1249,7 @@ function runPodium(isPay, rank, title){
         ${avatarHtml(rank[idx].p, idx===0?'big':'')}
         <div class="wname">${esc(rank[idx].p)}</div>
       </div>
-      <div class="wval" data-target="${rank[idx].v}" data-money="${isPay?1:0}">0</div>
+      <div class="wval" data-target="${rank[idx].v}" data-kind="${isPay?'money':(isAnz?'anz':'alk')}">0</div>
       <div class="ped" style="--h:${heightFor(idx)}px; background:${pedColors[idx]}">${medals[idx]}</div>
     </div>`;
   }).join("");
@@ -1086,7 +1266,7 @@ function runPodium(isPay, rank, title){
   const barStart=(idx,label)=>{ const el=document.getElementById("col"+idx); if(!el) return;
     el.classList.add("barup");
     if(rs()&&rank[idx]) rs().textContent=label;
-    const v=el.querySelector(".wval"); if(v){ countUp(v, +v.dataset.target, v.dataset.money==="1", BAR_MS); } };
+    const v=el.querySelector(".wval"); if(v){ countUp(v, +v.dataset.target, v.dataset.kind, BAR_MS); } };
   const nameReveal=(idx)=>{ const el=document.getElementById("col"+idx); if(!el) return;
     el.classList.add("namein"); pop(); };
   // Platz 3: Balken hochfahren, danach Pause, dann Name
@@ -1102,11 +1282,11 @@ function runPodium(isPay, rank, title){
   const p1NameAt=p1Start+BAR_MS+PAUSE_MS;
   tmr(()=>{
     nameReveal(0);
-    if(rs()) rs().textContent="🥇 "+ WINNER_TITLES[isPay?"pay":"alk"][Math.floor(Math.random()*5)];
+    if(rs()) rs().textContent="🥇 "+ WINNER_TITLES[(isPay||isAnz)?"pay":"alk"][Math.floor(Math.random()*5)];
     fanfare(); partyBlast();
     const rb=document.getElementById("revealBody"); if(rb){ rb.classList.add("shake"); setTimeout(()=>rb.classList.remove("shake"),600); }
   },p1NameAt);
-  if(!isPay){
+  if(!isPay && !isAnz){
     tmr(()=>{
       const rc=document.getElementById("revcompare"); if(!rc||!rank[0]) return;
       rc.innerHTML=`<div class="rc-head">${esc(rank[0].p)}s ${rank[0].v.toFixed(0)} g reiner Alkohol entsprechen…</div>`+
@@ -1116,12 +1296,12 @@ function runPodium(isPay, rank, title){
   }
   tmr(()=>{
     const act=document.getElementById("revactions"); if(!act) return;
-    const cat=isPay?"pay":"alk";
+    const cat=isPay?"pay":(isAnz?"anz":"alk");
     let btns=`<button class="btn ghost" onclick="openReveal()">◀ Auswahl</button>`;
     btns+=`<button class="btn" onclick="closeReveal();sheetRanking('${cat}')">📊 Alle anzeigen</button>`;
-    if(isPay && hatAlkDaten()) btns=`<button class="btn" onclick="startReveal('alk')">🥃 Alkohol ›</button>`+btns;
+    if((isPay||isAnz) && hatAlkDaten()) btns=`<button class="btn" onclick="startReveal('alk')">🥃 Alkohol ›</button>`+btns;
     act.innerHTML=btns; act.classList.add("show");
-  },p1NameAt+(isPay?800:1600));
+  },p1NameAt+((isPay||isAnz)?800:1600));
 }
 
 /* anschauliche Vergleichswerte für g reinen Alkohol
@@ -1141,10 +1321,10 @@ function alkVergleich(g){
   ];
 }
 
-function countUp(el, target, money, dur){
+function countUp(el, target, kind, dur){
   dur=dur||1700; const t0=performance.now();
   const step=now=>{ const k=Math.min(1,(now-t0)/dur); const val=target*(1-Math.pow(1-k,3));
-    el.textContent=money?fmt(r2(val)):`${Math.round(val)} g`;
+    el.textContent = kind==="money" ? fmt(r2(val)) : (kind==="anz" ? `${Math.round(val)}×` : `${Math.round(val)} g`);
     if(k<1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
