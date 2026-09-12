@@ -494,15 +494,17 @@ function effPayers(){
   data.eintraege.forEach(e=>{ map[e.id]=e.bezahlt; });
   data.personen.forEach(P=>{
     const limit=freibierFor(P);
+    // Nur Biere aus Bier-Runden zehren am Freibier-Kontingent. Ausgegebene Runden und
+    // einzeln gebuchte Biere zahlt ohnehin jemand anderes bzw. die Person selbst und
+    // dürfen die Freibiere aus der Kasse nicht aufbrauchen.
     const biers=data.eintraege
-      .filter(e=>e.trinkt===P && e.getraenk && e.getraenk.toLowerCase()==="bier")
+      .filter(e=>e.trinkt===P && e.getraenk && e.getraenk.toLowerCase()==="bier"
+        && e.spielinfo && e.spielinfo.startsWith("Bier-Runde"))
       .sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
     let n=0;
     biers.forEach(e=>{
       n+=e.anzahl||1;
-      if(e.spielinfo && e.spielinfo.startsWith("Bier-Runde")){
-        map[e.id]= n<=limit ? "KASSE" : P;
-      }
+      map[e.id]= n<=limit ? "KASSE" : P;
     });
   });
   // Frei-Getränke für Gäste: greift nur, wenn der Gast sonst selbst zahlen müsste.
@@ -555,7 +557,8 @@ function doBierRunde(){
   data.eintraege.forEach(e=>{ if(e.spielinfo&&e.spielinfo.startsWith("Bier-Runde")){ const m=e.spielinfo.match(/\d+/); if(m)maxNr=Math.max(maxNr,+m[0]); }});
   const nr=maxNr+1;
   const cnt={}; data.personen.forEach(p=>cnt[p]=0);
-  data.eintraege.forEach(e=>{ if(e.getraenk.toLowerCase()==="bier"&&cnt[e.trinkt]!==undefined) cnt[e.trinkt]+=e.anzahl; });
+  // Nur Bier-Runden zählen gegen das Freibier-Kontingent (siehe effPayers)
+  data.eintraege.forEach(e=>{ if(e.getraenk.toLowerCase()==="bier" && e.spielinfo && e.spielinfo.startsWith("Bier-Runde") && cnt[e.trinkt]!==undefined) cnt[e.trinkt]+=e.anzahl; });
   const wer=aktivePersonen();
   pushEntries(wer.map(p=>{
     const n=cnt[p]+1;
@@ -748,17 +751,18 @@ function whatsAppText(){
   };
   const bloecke=[];
   data.personen.forEach(p=>{
-    const items=data.eintraege.filter(e=>e.trinkt===p);
+    // Maßgeblich ist, was die Person ZAHLT - nicht was sie getrunken hat.
+    const items=data.eintraege.filter(e=>m[e.id]===p);
     if(!items.length) return;
     let kopf=p+(isGast(p)?" (Gast)":"")+":";
     if(!ohnePreise()){
-      const summe=r2(data.eintraege.filter(e=>m[e.id]===p).reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
+      const summe=r2(items.reduce((s,e)=>s+e.anzahl*preisOf(e.getraenk),0));
       if(summe>0) kopf=`${p}${isGast(p)?" (Gast)":""}: ${fmt(summe)}`;
     }
     bloecke.push(kopf+"\n"+liste(items));
   });
-  // Nicht zugeordnete 5er-Shots separat ausweisen, damit nichts unter den Tisch fällt
-  const offen=data.eintraege.filter(e=>!e.trinkt);
+  // Einträge ohne jeden Zahler separat ausweisen, damit nichts unter den Tisch fällt
+  const offen=data.eintraege.filter(e=>!m[e.id]);
   if(offen.length) bloecke.push("Noch keinem zugeordnet:\n"+liste(offen));
   // Kasse zum Schluss mit eigener Getränkeliste
   const kasseItems=data.eintraege.filter(e=>m[e.id]==="KASSE");
@@ -1024,7 +1028,7 @@ function restoreBackup(key){
 function opts(list){ return list.map(x=>`<option>${esc(x)}</option>`).join(""); }
 function personOpts(){ return opts(data.personen); }
 function daOpts(){ const a=aktivePersonen(); return opts(a.length?a:data.personen); }
-function getraenkOpts(){ return opts(data.getraenke.map(g=>g.name)); }
+function getraenkOpts(){ return opts(data.getraenke.map(g=>g.name).sort((a,b)=>a.localeCompare(b,"de",{sensitivity:"base"}))); }
 function openSheet(html, full){ const s=document.getElementById("sheet"); s.innerHTML=`<div class="bar"></div>`+html; s.classList.toggle("full", !!full); document.getElementById("overlay").classList.add("on"); }
 function closeSheet(){ document.getElementById("overlay").classList.remove("on"); }
 function head(title){ return `<div class="sh-head"><span class="t">${title}</span><button onclick="closeSheet()">Fertig</button></div>`; }
