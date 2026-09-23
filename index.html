@@ -355,13 +355,14 @@ function migrGast(o){
   else o.anwesend=o.anwesend.filter(n=>(o.personen||[]).includes(n));
   if(typeof o.ohnePreise!=="boolean") o.ohnePreise=false;
   if(!o.hoschnawa || typeof o.hoschnawa!=="object") o.hoschnawa={};
+  if(!Array.isArray(o.hoschnawaRunden)) o.hoschnawaRunden=[];
   return o;
 }
 function seed(){
   return {
     personen:["Jerry","Luiz","Mats","Flo"], gaeste:[], avatars:{}, bierKasse:3,
     gastRegeln:{ eigene:false, freibier:3, frei:[] },
-    anwesend:["Jerry","Luiz","Mats","Flo"], ohnePreise:false, hoschnawa:{},
+    anwesend:["Jerry","Luiz","Mats","Flo"], ohnePreise:false, hoschnawa:{}, hoschnawaRunden:[],
     getraenke:[
       {name:"Jägermeister",preis:2.00,vol:35,ml:20},{name:"Klopfer",preis:1.50,vol:15,ml:20},{name:"Tequila",preis:2.50,vol:38,ml:20},
       {name:"Vodka",preis:2.00,vol:40,ml:20},{name:"Obstler",preis:1.80,vol:40,ml:20},{name:"Ouzo",preis:2.20,vol:37,ml:20},
@@ -564,6 +565,7 @@ function undo(){
   const a=undoStack.pop(); if(!a) return;
   if(a.entryIds) data.eintraege=data.eintraege.filter(e=>!a.entryIds.includes(e.id));
   if(a.fuenferId) data.fuenferSpiel=data.fuenferSpiel.filter(f=>f.id!==a.fuenferId);
+  if(a.hsRundeId) data.hoschnawaRunden=data.hoschnawaRunden.filter(r=>r.id!==a.hsRundeId);
   save(); render(); toast("Rückgängig");
 }
 
@@ -714,10 +716,17 @@ function hsVerbuchen(){
     const n=hsShots(p), shot=hsRow(p).shot;
     if(n>0 && shot) eintraege.push({getraenk:shot, trinkt:p, bezahlt:p, anzahl:n, spielinfo:"HoSchnaWa"});
   });
-  if(!eintraege.length) return toast("Nichts zu verbuchen");
+  // Alle Würfe (auch von Personen mit 0 Shots) bleiben für die Statistik erhalten
+  const spieler=data.personen.filter(hsHatWuerfe).map(p=>({name:p, w:hsRow(p).w.slice(), shots:hsShots(p), shot:hsRow(p).shot||null}));
+  if(!spieler.length) return toast("Nichts zu verbuchen");
   const gesamt=eintraege.reduce((s,e)=>s+e.anzahl,0);
-  askConfirm(`${gesamt} Shot${gesamt===1?"":"s"} für ${eintraege.length} Person${eintraege.length===1?"":"en"} verbuchen?`, ()=>{
-    pushEntries(eintraege);
+  const frage=eintraege.length
+    ? `${gesamt} Shot${gesamt===1?"":"s"} für ${eintraege.length} Person${eintraege.length===1?"":"en"} verbuchen?`
+    : "Keine Shots fällig – nur die Würfe speichern?";
+  askConfirm(frage, ()=>{
+    const runde={id:uid(), timestamp:new Date().toISOString(), spieler};
+    data.hoschnawaRunden.push(runde);
+    pushEntries(eintraege, {hsRundeId:runde.id});
     data.hoschnawa={}; save(); render();
     toast(`${gesamt} Shots verbucht`);
   }, "Verbuchen");
@@ -1242,7 +1251,7 @@ function toggleGastFrei(name){
   if(g.frei.includes(name)) g.frei=g.frei.filter(x=>x!==name); else g.frei.push(name);
   save(); render(); toast(g.frei.includes(name)?`${name} für Gäste frei`:`${name} nicht mehr frei`);
 }
-function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; data.hoschnawa={}; data.anwesend=data.personen.slice(); undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
+function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; data.hoschnawa={}; data.hoschnawaRunden=[]; data.anwesend=data.personen.slice(); undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
 
 /* ---------- Export / Import ---------- */
 function exportData(){
