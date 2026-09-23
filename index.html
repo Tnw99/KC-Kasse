@@ -157,9 +157,29 @@
   nav{position:fixed; left:0; right:0; bottom:0; display:flex; background:rgba(22,35,30,.94);
     backdrop-filter:blur(12px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:20}
   nav button{flex:1; background:none; border:none; color:var(--dim); font-family:inherit; padding:10px 0 8px;
-    font-size:.68rem; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:3px}
+    font-size:.62rem; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:3px;
+    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   nav button.on{color:var(--amber)}
+
+  /* HoSchnaWa-Tabelle */
+  .hstable{width:100%; border-collapse:collapse; margin-top:6px}
+  .hstable th{font-size:.66rem; color:var(--dim); font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; padding:0 2px 6px; text-align:center}
+  .hstable th.nm{text-align:left; padding-left:2px}
+  .hstable td{padding:3px 2px; border-top:1px solid var(--line)}
+  .hstable td.nm{font-weight:700; font-size:.86rem; max-width:78px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap}
+  .hstable input.w{width:100%; min-width:0; background:var(--bg2); border:1px solid var(--line);
+    border-radius:8px; color:var(--chalk); font-family:inherit; font-size:.9rem; font-weight:700;
+    text-align:center; padding:7px 0; -moz-appearance:textfield}
+  .hstable input.w::-webkit-outer-spin-button,.hstable input.w::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .hstable input.w:focus{outline:none; border-color:var(--amber)}
+  .hstable td.calc{text-align:center; font-size:.78rem; color:var(--dim); font-weight:700; white-space:nowrap}
+  .hstable td.res{text-align:center; font-size:1.05rem; font-weight:800; color:var(--amber)}
+  .hstable select.sh{width:100%; min-width:0; background:var(--bg2); border:1px solid var(--line);
+    border-radius:8px; color:var(--chalk); font-family:inherit; font-size:.78rem; padding:7px 4px}
+  .hswrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
 
   /* sheet */
   .overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:flex-end; z-index:50}
@@ -281,6 +301,8 @@
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Aktionen</button>
   <button data-v="fuenfer" onclick="setView('fuenfer')">
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.3"/><circle cx="15.5" cy="8.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="8.5" cy="15.5" r="1.3"/><circle cx="15.5" cy="15.5" r="1.3"/></svg>5er</button>
+  <button data-v="hoschnawa" onclick="setView('hoschnawa')">
+    <svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.6L20 9.2l-4.2 3.8 1.2 5.8L12 16l-5 2.8 1.2-5.8L4 9.2l5.8-.6z"/></svg>HoSchnaWa</button>
   <button data-v="kasse" onclick="setView('kasse')">
     <svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 10h18M7 15h4"/></svg>Kasse</button>
   <button data-v="log" onclick="setView('log')">
@@ -332,13 +354,14 @@ function migrGast(o){
   if(!Array.isArray(o.anwesend)) o.anwesend=(o.personen||[]).slice();
   else o.anwesend=o.anwesend.filter(n=>(o.personen||[]).includes(n));
   if(typeof o.ohnePreise!=="boolean") o.ohnePreise=false;
+  if(!o.hoschnawa || typeof o.hoschnawa!=="object") o.hoschnawa={};
   return o;
 }
 function seed(){
   return {
     personen:["Jerry","Luiz","Mats","Flo"], gaeste:[], avatars:{}, bierKasse:3,
     gastRegeln:{ eigene:false, freibier:3, frei:[] },
-    anwesend:["Jerry","Luiz","Mats","Flo"], ohnePreise:false,
+    anwesend:["Jerry","Luiz","Mats","Flo"], ohnePreise:false, hoschnawa:{},
     getraenke:[
       {name:"Jägermeister",preis:2.00,vol:35,ml:20},{name:"Klopfer",preis:1.50,vol:15,ml:20},{name:"Tequila",preis:2.50,vol:38,ml:20},
       {name:"Vodka",preis:2.00,vol:40,ml:20},{name:"Obstler",preis:1.80,vol:40,ml:20},{name:"Ouzo",preis:2.20,vol:37,ml:20},
@@ -622,7 +645,7 @@ function render(){
   document.getElementById("undoBtn").disabled=undoStack.length===0;
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.v===view));
   const m=document.getElementById("main");
-  m.innerHTML = view==="aktionen"?vAktionen(): view==="fuenfer"?vFuenfer(): view==="kasse"?vKasse(): view==="log"?vLog(): vSetup();
+  m.innerHTML = view==="aktionen"?vAktionen(): view==="fuenfer"?vFuenfer(): view==="hoschnawa"?vHoschnawa(): view==="kasse"?vKasse(): view==="log"?vLog(): vSetup();
 }
 
 function vAktionen(){
@@ -645,6 +668,94 @@ function vAktionen(){
     <p class="hint" style="margin-top:14px">Shot-Runde: der Starter (Alle 9) geht auf die Kasse, alle anderen zahlen selbst.
     Bier-Runde: die ersten ${data.bierKasse} Bier pro Person zahlt die Kasse, danach selbst.
     Runde: zahlt komplett der Ausgebende.</p>`;
+}
+
+/* ---------- HoSchnaWa ----------
+   Jede/r wirft 3-mal. Summe / 5, kaufmännisch gerundet = Anzahl Shots, die die Person
+   bestellt und trinkt. Die laufende Tabelle liegt in data.hoschnawa und wird beim
+   Verbuchen geleert. */
+function hsRow(name){
+  const r=data.hoschnawa[name];
+  return (r && typeof r==="object") ? r : {w:[null,null,null], shot:""};
+}
+function hsSumme(name){
+  const w=hsRow(name).w;
+  return w.reduce((s,x)=>s+(x==null||x===""?0:Number(x)),0);
+}
+function hsHatWuerfe(name){ return hsRow(name).w.some(x=>x!=null && x!==""); }
+function hsShots(name){ return hsHatWuerfe(name) ? Math.round(hsSumme(name)/5) : 0; }
+function hsSetWurf(name, idx, v){
+  const r=hsRow(name);
+  const n=v===""?null:Math.max(0,Math.min(9,parseInt(v)||0));
+  r.w[idx]=n; data.hoschnawa[name]=r; save();
+  // Nur die betroffene Zeile aktualisieren, damit die Tastatur offen bleibt
+  hsUpdateRow(name);
+}
+function hsSetShot(name, v){ const r=hsRow(name); r.shot=v; data.hoschnawa[name]=r; save(); }
+function hsUpdateRow(name){
+  const id="hs_"+btoa(unescape(encodeURIComponent(name))).replace(/=/g,"");
+  const c=document.getElementById(id+"_calc"), s=document.getElementById(id+"_res");
+  const t=document.getElementById("hsTotal");
+  if(c) c.textContent=hsHatWuerfe(name)?`${hsSumme(name)} / 5 = ${(hsSumme(name)/5).toFixed(1)}`:"–";
+  if(s) s.textContent=hsHatWuerfe(name)?hsShots(name):"–";
+  if(t) t.textContent=hsGesamtShots();
+}
+function hsGesamtShots(){ return data.personen.reduce((s,p)=>s+hsShots(p),0); }
+function hsReset(){
+  askConfirm("Tabelle leeren? Die Würfe und Shot-Auswahl gehen verloren.", ()=>{
+    data.hoschnawa={}; save(); render(); toast("Tabelle geleert");
+  }, "Leeren");
+}
+function hsVerbuchen(){
+  const offen=data.personen.filter(p=>hsShots(p)>0 && !hsRow(p).shot);
+  if(offen.length) return toast(`Shot fehlt bei: ${offen.join(", ")}`);
+  const eintraege=[];
+  data.personen.forEach(p=>{
+    const n=hsShots(p), shot=hsRow(p).shot;
+    if(n>0 && shot) eintraege.push({getraenk:shot, trinkt:p, bezahlt:p, anzahl:n, spielinfo:"HoSchnaWa"});
+  });
+  if(!eintraege.length) return toast("Nichts zu verbuchen");
+  const gesamt=eintraege.reduce((s,e)=>s+e.anzahl,0);
+  askConfirm(`${gesamt} Shot${gesamt===1?"":"s"} für ${eintraege.length} Person${eintraege.length===1?"":"en"} verbuchen?`, ()=>{
+    pushEntries(eintraege);
+    data.hoschnawa={}; save(); render();
+    toast(`${gesamt} Shots verbucht`);
+  }, "Verbuchen");
+}
+function vHoschnawa(){
+  if(!data.personen.length) return `<div class="empty">Erst Personen im Setup-Tab anlegen.</div>`;
+  const wer=aktivePersonen();
+  if(!wer.length) return `<div class="empty">Niemand als anwesend markiert. Im Aktionen-Tab anhaken.</div>`;
+  const rows=wer.map(p=>{
+    const r=hsRow(p);
+    const id="hs_"+btoa(unescape(encodeURIComponent(p))).replace(/=/g,"");
+    const esc2=p.replace(/'/g,"\\'");
+    const felder=[0,1,2].map(i=>
+      `<td><input class="w" type="number" inputmode="numeric" min="0" max="9" placeholder="–"
+        value="${r.w[i]==null?"":r.w[i]}" onchange="hsSetWurf('${esc2}',${i},this.value)"></td>`).join("");
+    const opts=data.getraenke.map(g=>g.name).sort((a,b)=>a.localeCompare(b,"de",{sensitivity:"base"}))
+      .map(n=>`<option${r.shot===n?" selected":""}>${esc(n)}</option>`).join("");
+    return `<tr>
+      <td class="nm">${esc(p)}</td>
+      ${felder}
+      <td class="calc" id="${id}_calc">${hsHatWuerfe(p)?`${hsSumme(p)} / 5 = ${(hsSumme(p)/5).toFixed(1)}`:"–"}</td>
+      <td class="res" id="${id}_res">${hsHatWuerfe(p)?hsShots(p):"–"}</td>
+      <td><select class="sh" onchange="hsSetShot('${esc2}',this.value)">
+        <option value=""${r.shot?"":" selected"}>Shot …</option>${opts}</select></td>
+    </tr>`;
+  }).join("");
+  return `
+    <h2>HoSchnaWa</h2>
+    <div class="hswrap"><table class="hstable">
+      <thead><tr><th class="nm">Name</th><th>1.</th><th>2.</th><th>3.</th><th>Summe / 5</th><th>Shots</th><th>Getränk</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="grand" style="margin-top:14px"><div><b>Shots gesamt</b></div><span class="v" id="hsTotal">${hsGesamtShots()}</span></div>
+    <div class="stack" style="margin-top:12px">
+      <button class="btn full" onclick="hsVerbuchen()">✅ Shots verbuchen</button>
+      <button class="btn full ghost" onclick="hsReset()">🗑️ Tabelle leeren</button>
+    </div>
+    <p class="hint">Jede/r wirft 3-mal. Die Summe geteilt durch 5 – gerundet – ergibt die Anzahl Shots, die die Person bestellt und trinkt. Verbucht wird auf die Person selbst mit dem Vermerk „HoSchnaWa“.</p>`;
 }
 
 function vFuenfer(){
@@ -1131,7 +1242,7 @@ function toggleGastFrei(name){
   if(g.frei.includes(name)) g.frei=g.frei.filter(x=>x!==name); else g.frei.push(name);
   save(); render(); toast(g.frei.includes(name)?`${name} für Gäste frei`:`${name} nicht mehr frei`);
 }
-function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; data.anwesend=data.personen.slice(); undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
+function resetAbend(){ askConfirm("Alle Einträge & 5er-Shots dieses Abends löschen?", ()=>{ idbPut("pre-change",JSON.stringify(data)); data.eintraege=[]; data.fuenferSpiel=[]; data.hoschnawa={}; data.anwesend=data.personen.slice(); undoStack=[]; save(); render(); toast("Abend zurückgesetzt"); }, "Zurücksetzen"); }
 
 /* ---------- Export / Import ---------- */
 function exportData(){
